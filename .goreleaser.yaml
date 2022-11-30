@@ -1,0 +1,15 @@
+builds:
+  - env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - windows
+archives:
+  - name_template: "{{ .Binary }}-{{ .Os }}-{{ .Arch }}"
+    format_overrides:
+      - goos: windows
+        format: zip
+    files:
+      - README.md
+snapshot:
+  name_template: "{{ incpatch .Version }}-next"
