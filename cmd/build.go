@@ -47,6 +47,13 @@ func (o *option) preRun(cmd *cobra.Command, args []string) {
 	if o.description == "" {
 		o.description = ""
 	}
+
+	// keep the status be compatible with different system
+	switch o.status {
+	case "Succeeded":
+		// from Argo Workflow
+		o.status = "success"
+	}
 }
 
 func (o *option) runE(cmd *cobra.Command, args []string) (err error) {
