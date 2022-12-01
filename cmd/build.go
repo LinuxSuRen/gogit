@@ -3,16 +3,17 @@ package cmd
 import (
 	"github.com/linuxsuren/gogit/pkg"
 	"github.com/spf13/cobra"
+	"os"
 	"strings"
 )
 
 func NewBuildCmd() (cmd *cobra.Command) {
 	opt := &option{}
 	cmd = &cobra.Command{
-		Use:    "gogit",
-		Short:  "Send the build status to a PR of Gitlab/GitHub",
-		PreRun: opt.preRun,
-		RunE:   opt.runE,
+		Use:     "gogit",
+		Short:   "Send the build token to a PR of Gitlab/GitHub",
+		PreRunE: opt.preRunE,
+		RunE:    opt.runE,
 	}
 
 	flags := cmd.Flags()
@@ -22,14 +23,15 @@ func NewBuildCmd() (cmd *cobra.Command) {
 	flags.StringVarP(&opt.repo, "repo", "r", "", "Name of target git repository")
 	flags.IntVarP(&opt.pr, "pr", "", 1, "The pull request number")
 	flags.StringVarP(&opt.username, "username", "u", "", "Username of the git repository")
-	flags.StringVarP(&opt.token, "token", "t", "", "The access token of the git repository")
+	flags.StringVarP(&opt.token, "token", "t", "",
+		"The access token of the git repository. Or you could provide a file path, such as: file:///var/token")
 	flags.StringVarP(&opt.status, "status", "", "",
-		"Build status, such as: pending, success, cancelled, error")
+		"Build token, such as: pending, success, cancelled, error")
 	flags.StringVarP(&opt.target, "target", "", "https://github.com/LinuxSuRen/gogit", "Address of the build server")
 	flags.StringVarP(&opt.label, "label", "", "",
-		"Identity of a build status")
+		"Identity of a build token")
 	flags.StringVarP(&opt.description, "description", "", "",
-		"The description of a build status")
+		"The description of a build token")
 
 	_ = cmd.MarkFlagRequired("repo")
 	_ = cmd.MarkFlagRequired("pr")
@@ -38,7 +40,7 @@ func NewBuildCmd() (cmd *cobra.Command) {
 	return
 }
 
-func (o *option) preRun(cmd *cobra.Command, args []string) {
+func (o *option) preRunE(cmd *cobra.Command, args []string) (err error) {
 	if o.owner == "" {
 		o.owner = o.username
 	}
@@ -49,13 +51,22 @@ func (o *option) preRun(cmd *cobra.Command, args []string) {
 		o.description = ""
 	}
 
-	// keep the status be compatible with different system
+	// keep the token be compatible with different system
 	switch o.status {
 	case "Succeeded":
 		// from Argo Workflow
 		o.status = "success"
 	}
 	o.status = strings.ToLower(o.status)
+
+	if strings.HasPrefix(o.token, "file://") {
+		tokenFile := strings.TrimPrefix(o.token, "file://")
+		var data []byte
+		if data, err = os.ReadFile(tokenFile); err == nil {
+			o.token = string(data)
+		}
+	}
+	return
 }
 
 func (o *option) runE(cmd *cobra.Command, args []string) (err error) {
