@@ -1,3 +1,5 @@
+[![codecov](https://codecov.io/gh/LinuxSuRen/gogit/branch/master/graph/badge.svg?token=mnFyeD2IQ7)](https://codecov.io/gh/LinuxSuRen/gogit)
+
 `gogit` could send the build status to different git providers. Such as:
 
 * GitHub

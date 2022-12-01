@@ -3,6 +3,7 @@ package cmd
 import (
 	"github.com/linuxsuren/gogit/pkg"
 	"github.com/spf13/cobra"
+	"strings"
 )
 
 func NewBuildCmd() (cmd *cobra.Command) {
@@ -54,6 +55,7 @@ func (o *option) preRun(cmd *cobra.Command, args []string) {
 		// from Argo Workflow
 		o.status = "success"
 	}
+	o.status = strings.ToLower(o.status)
 }
 
 func (o *option) runE(cmd *cobra.Command, args []string) (err error) {
