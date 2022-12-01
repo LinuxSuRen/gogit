@@ -39,6 +39,7 @@ jobs:
   goreleaser:
     name: Run GoReleaser
     runs-on: ubuntu-20.04
+    if: github.ref != 'refs/heads/master'
     steps:
       - name: Set up Go 1.18
         uses: actions/setup-go@v3
@@ -100,3 +101,11 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+  UpdateReleaseDraft:
+    runs-on: ubuntu-20.04
+    if: github.ref == 'refs/heads/master'
+    steps:
+      - uses: release-drafter/release-drafter@v5
+        env:
+          GITHUB_TOKEN: ${{ secrets.GH_PUBLISH_SECRETS }}
