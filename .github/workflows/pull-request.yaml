@@ -8,6 +8,10 @@ on:
     branches:
       - master
 
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
 jobs:
   build:
     name: Build
@@ -28,11 +32,25 @@ jobs:
         with:
           version: latest
           args: release --skip-publish --rm-dist
+
+  build-image:
+    name: Build Image
+    runs-on: ubuntu-20.04
+    if: github.ref != 'refs/heads/master'
+    steps:
+      - name: Set up Go 1.18
+        uses: actions/setup-go@v3
+        with:
+          go-version: 1.18
+        id: go
+      - name: Check out code
+        uses: actions/checkout@v3.0.0
       - name: Build Image
         run: |
           make image
 
   image:
+    name: Publish Image
     runs-on: ubuntu-20.04
     if: github.ref == 'refs/heads/master'
     steps:
