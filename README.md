@@ -17,6 +17,10 @@ gogit --provider gitlab \
   --token h-zez9CWzyzykbLoS53s
 ```
 
+Or in the following use cases:
+
+* [Tekton Task](https://hub.tekton.dev/tekton/task/gogit)
+
 ## TODO
 * Support more git providers
 
