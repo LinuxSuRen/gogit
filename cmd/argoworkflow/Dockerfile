@@ -1,0 +1,13 @@
+FROM golang:1.18 as builder
+
+WORKDIR /workspace
+COPY . .
+
+RUN go mod download
+RUN CGO_ENABLE=0 go build -ldflags "-w -s" -o workflow-executor-gogit
+
+FROM ubuntu:kinetic
+
+COPY --from=builder /workspace/workflow-executor-gogit /usr/bin/workflow-executor-gogit
+RUN apt update -y && apt install ca-certificates -y
+CMD ["workflow-executor-gogit"]
