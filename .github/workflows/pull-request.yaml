@@ -11,6 +11,7 @@ on:
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
+  IMAGE_EXECUTOR_NAME: "linuxsuren/workflow-executor-gogit"
 
 jobs:
   build:
@@ -24,6 +25,9 @@ jobs:
         id: go
       - name: Check out code
         uses: actions/checkout@v3.0.0
+      - name: Build
+        run: |
+          make build
       - name: Test
         run: |
           go test ./... -coverprofile coverage.out
@@ -35,6 +39,21 @@ jobs:
           flags: unittests
           name: codecov-umbrella
           fail_ci_if_error: true
+
+
+  build-argo-workflow-executor:
+    runs-on: ubuntu-20.04
+    steps:
+      - name: Set up Go 1.18
+        uses: actions/setup-go@v3
+        with:
+          go-version: 1.18
+        id: go
+      - name: Check out code
+        uses: actions/checkout@v3.0.0
+      - name: Test
+        run: |
+          make build-workflow-executor-gogit
 
   goreleaser:
     name: Run GoReleaser
@@ -59,16 +78,21 @@ jobs:
     runs-on: ubuntu-20.04
     if: github.ref != 'refs/heads/master'
     steps:
-      - name: Set up Go 1.18
-        uses: actions/setup-go@v3
-        with:
-          go-version: 1.18
-        id: go
       - name: Check out code
         uses: actions/checkout@v3.0.0
       - name: Build Image
         run: |
           make image
+
+  build-image-argo-workflow-executor:
+    runs-on: ubuntu-20.04
+    if: github.ref != 'refs/heads/master'
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v3.0.0
+      - name: Build Image
+        run: |
+          make image-workflow-executor-gogit
 
   image:
     name: Publish Image
@@ -96,6 +120,37 @@ jobs:
         uses: docker/build-push-action@ac9327eae2b366085ac7f6a2d02df8aa8ead720a
         with:
           context: .
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  image-argo-workflow-executor:
+    runs-on: ubuntu-20.04
+    if: github.ref == 'refs/heads/master'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3.0.0
+      - name: Setup Docker buildx
+        uses: docker/setup-buildx-action@79abd3f86f79a9d68a23c75a09a9a85889262adf
+      - name: Log into registry ${{ env.REGISTRY }}
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@28218f9b04b4f3f62068d7b6ce6ca5b26e35336c
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GH_PUBLISH_SECRETS }}
+      - name: Extract Docker metadata
+        id: meta
+        uses: docker/metadata-action@98669ae865ea3cffbcbaa878cf57c20bbf1c6c38
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_EXECUTOR_NAME }}
+      - name: Build and push Docker image
+        id: build-and-push
+        uses: docker/build-push-action@ac9327eae2b366085ac7f6a2d02df8aa8ead720a
+        with:
+          context: cmd/argoworkflow
           push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}

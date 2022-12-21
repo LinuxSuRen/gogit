@@ -1,0 +1,30 @@
+apiVersion: argoproj.io/v1alpha1
+kind: ExecutorPlugin
+metadata:
+  name: gogit
+spec:
+  sidecar:
+    container:
+      image: ghcr.io/linuxsuren/workflow-executor-gogit:master
+      args:
+        - --provider
+        - gitlab
+#        - --server
+#        - http://ip:port
+#        - --username
+#        - linuxsuren
+#        - --token
+#        - your-token
+      name: gogit-executor-plugin
+      ports:
+        - containerPort: 4355
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65534 # nobody
+      resources:
+        requests:
+          memory: "64Mi"
+          cpu: "250m"
+        limits:
+          memory: "128Mi"
+          cpu: "500m"
