@@ -5,15 +5,16 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	wfv1 "github.com/argoproj/argo-workflows/v3/pkg/apis/workflow/v1alpha1"
+	"github.com/argoproj/argo-workflows/v3/pkg/plugins/executor"
 	"github.com/linuxsuren/gogit/pkg"
 	"github.com/spf13/cobra"
 	"io"
-	"net/http"
-	"os"
-
-	"github.com/argoproj/argo-workflows/v3/pkg/plugins/executor"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
+	"net/http"
+	"os"
+	"strconv"
 )
 
 func main() {
@@ -63,7 +64,7 @@ type option struct {
 
 	Owner       string
 	Repo        string
-	PR          int
+	PR          string
 	Status      string
 	Target      string
 	Label       string
@@ -74,28 +75,50 @@ type DefaultPluginExecutor struct {
 	option *option
 }
 
+type pluginOption struct {
+	Option *option `json:"gogit-executor-plugin"`
+}
+
 func (e *DefaultPluginExecutor) Execute(args executor.ExecuteTemplateArgs) (resp executor.ExecuteTemplateResponse, err error) {
 	p := args.Template.Plugin.Value
+	fmt.Println("raw data", string(p))
 
-	opt := e.option
+	opt := &pluginOption{Option: e.option}
 	if err = json.Unmarshal(p, opt); err != nil {
 		return
 	}
 
+	fmt.Println("option is", *opt.Option)
 	// TODO get more information from context
-	err = pkg.Reconcile(context.Background(), pkg.RepoInformation{
-		Provider:    opt.Provider,
-		Server:      opt.Server,
-		Owner:       opt.Owner,
-		Repo:        opt.Repo,
-		PrNumber:    opt.PR,
-		Target:      opt.Target,
-		Username:    opt.Username,
-		Token:       opt.Token,
-		Status:      opt.Status,
-		Label:       opt.Label,
-		Description: opt.Description,
-	})
+	repo := pkg.RepoInformation{
+		Provider:    opt.Option.Provider,
+		Server:      opt.Option.Server,
+		Owner:       opt.Option.Owner,
+		Repo:        opt.Option.Repo,
+		Target:      opt.Option.Target,
+		Username:    opt.Option.Username,
+		Token:       opt.Option.Token,
+		Status:      opt.Option.Status,
+		Label:       opt.Option.Label,
+		Description: opt.Option.Description,
+	}
+	if repo.PrNumber, err = strconv.Atoi(opt.Option.PR); err != nil {
+		err = fmt.Errorf("wrong pull-request number, %v", err)
+		return
+	}
+	if err = pkg.Reconcile(context.Background(), repo); err == nil {
+		resp = executor.ExecuteTemplateResponse{
+			Body: executor.ExecuteTemplateReply{
+				Node: &wfv1.NodeResult{
+					Phase:   wfv1.NodeSucceeded,
+					Message: "success",
+				},
+			},
+		}
+		fmt.Println("send success")
+	} else {
+		fmt.Println("failed to send", err)
+	}
 	return
 }
 
@@ -132,12 +155,14 @@ func plugin(p PluginExecutor, kubeClient kubernetes.Interface, namespace string)
 
 		resp, err := p.Execute(args)
 		if err != nil {
+			fmt.Println("failed to execute plugin", err)
 			http.Error(w, ErrExecutingPlugin.Error(), http.StatusInternalServerError)
 			return
 		}
 
-		jsonResp, err := json.Marshal(resp)
+		jsonResp, err := json.Marshal(resp.Body)
 		if err != nil {
+			fmt.Println("something went wrong", err)
 			http.Error(w, "something went wrong", http.StatusBadRequest)
 		}
 

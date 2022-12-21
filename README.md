@@ -21,6 +21,86 @@ Or in the following use cases:
 
 * [Tekton Task](https://hub.tekton.dev/tekton/task/gogit)
 
+## Argo workflow Executor
+
+Install as an Argo workflow executor plugin:
+
+```yaml
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: gogit-executor-plugin
+  namespace: default
+---
+apiVersion: v1
+data:
+  sidecar.automountServiceAccountToken: "true"
+  sidecar.container: |
+    args:
+    - --provider
+    - gitlab
+    image: ghcr.io/linuxsuren/workflow-executor-gogit:master
+    command:
+    - workflow-executor-gogit
+    name: gogit-executor-plugin
+    ports:
+    - containerPort: 3001
+    resources:
+      limits:
+        cpu: 500m
+        memory: 128Mi
+      requests:
+        cpu: 250m
+        memory: 64Mi
+    securityContext:
+      allowPrivilegeEscalation: true
+      runAsNonRoot: true
+      runAsUser: 65534
+kind: ConfigMap
+metadata:
+  creationTimestamp: null
+  labels:
+    workflows.argoproj.io/configmap-type: ExecutorPlugin
+  name: gogit-executor-plugin
+  namespace: argo
+```
+
+then, create a WorkflowTemplate:
+```yaml
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: plugin
+  namespace: default
+spec:
+  entrypoint: main
+  hooks:
+    exit:
+      template: status
+    all:
+      template: status
+      expression: "true"
+  templates:
+  - container:
+      args:
+        - search
+        - kubectl
+      command:
+        - hd
+      image: ghcr.io/linuxsuren/hd:v0.0.70
+    name: main
+  - name: status
+    plugin:
+      gogit-executor-plugin:
+        description: success
+        label: test
+        owner: linuxsuren
+        pr: "3"
+        repo: test
+        status: success
+```
+
 ## TODO
 * Support more git providers
 

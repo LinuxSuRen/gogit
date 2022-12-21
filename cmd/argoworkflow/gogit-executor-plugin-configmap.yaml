@@ -1,15 +1,17 @@
 # This is an auto-generated file. DO NOT EDIT
 apiVersion: v1
 data:
-  sidecar.automountServiceAccountToken: "false"
+  sidecar.automountServiceAccountToken: "true"
   sidecar.container: |
     args:
     - --provider
     - gitlab
     image: ghcr.io/linuxsuren/workflow-executor-gogit:master
+    command:
+    - workflow-executor-gogit
     name: gogit-executor-plugin
     ports:
-    - containerPort: 4355
+    - containerPort: 3001
     resources:
       limits:
         cpu: 500m
@@ -18,6 +20,7 @@ data:
         cpu: 250m
         memory: 64Mi
     securityContext:
+      allowPrivilegeEscalation: true
       runAsNonRoot: true
       runAsUser: 65534
 kind: ConfigMap
@@ -26,3 +29,4 @@ metadata:
   labels:
     workflows.argoproj.io/configmap-type: ExecutorPlugin
   name: gogit-executor-plugin
+  namespace: argo
