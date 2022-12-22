@@ -6,15 +6,17 @@ import (
 	"errors"
 	"fmt"
 	wfv1 "github.com/argoproj/argo-workflows/v3/pkg/apis/workflow/v1alpha1"
+	wfclientset "github.com/argoproj/argo-workflows/v3/pkg/client/clientset/versioned"
 	"github.com/argoproj/argo-workflows/v3/pkg/plugins/executor"
 	"github.com/linuxsuren/gogit/pkg"
 	"github.com/spf13/cobra"
 	"io"
-	"k8s.io/client-go/kubernetes"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/rest"
 	"net/http"
 	"os"
 	"strconv"
+	"strings"
 )
 
 func main() {
@@ -32,6 +34,8 @@ func main() {
 		"Username of the git server")
 	flags.StringVarP(&opt.Token, "token", "", "",
 		"Personal access token of  the git server")
+	flags.StringVarP(&opt.Target, "target", "", "http://argo.argo-server.svc:2746",
+		"The root URL of Argo Workflows UI")
 	flags.IntVarP(&opt.Port, "port", "", 3001,
 		"The port of the HTTP server")
 	if err := cmd.Execute(); err != nil {
@@ -44,13 +48,9 @@ func (o *option) runE(cmd *cobra.Command, args []string) (err error) {
 	if config, err = rest.InClusterConfig(); err != nil {
 		return
 	}
+	client := wfclientset.NewForConfigOrDie(config)
 
-	var client *kubernetes.Clientset
-	if client, err = kubernetes.NewForConfig(config); err != nil {
-		return
-	}
-
-	http.HandleFunc("/api/v1/template.execute", plugin(&DefaultPluginExecutor{option: o}, client, ""))
+	http.HandleFunc("/api/v1/template.execute", plugin(&DefaultPluginExecutor{option: o}, client))
 	err = http.ListenAndServe(fmt.Sprintf(":%d", o.Port), nil)
 	return
 }
@@ -79,52 +79,78 @@ type pluginOption struct {
 	Option *option `json:"gogit-executor-plugin"`
 }
 
-func (e *DefaultPluginExecutor) Execute(args executor.ExecuteTemplateArgs) (resp executor.ExecuteTemplateResponse, err error) {
+func (e *DefaultPluginExecutor) Execute(args executor.ExecuteTemplateArgs, status wfv1.WorkflowStatus) (
+	resp executor.ExecuteTemplateResponse, err error) {
 	p := args.Template.Plugin.Value
-	fmt.Println("raw data", string(p))
 
 	opt := &pluginOption{Option: e.option}
 	if err = json.Unmarshal(p, opt); err != nil {
 		return
 	}
-
 	fmt.Println("option is", *opt.Option)
-	// TODO get more information from context
+
+	targetAddress := fmt.Sprintf("%s/workflows/%s/%s",
+		opt.Option.Target,
+		args.Workflow.ObjectMeta.Namespace,
+		args.Workflow.ObjectMeta.Name)
 	repo := pkg.RepoInformation{
 		Provider:    opt.Option.Provider,
 		Server:      opt.Option.Server,
 		Owner:       opt.Option.Owner,
 		Repo:        opt.Option.Repo,
-		Target:      opt.Option.Target,
+		Target:      targetAddress,
 		Username:    opt.Option.Username,
 		Token:       opt.Option.Token,
 		Status:      opt.Option.Status,
 		Label:       opt.Option.Label,
 		Description: opt.Option.Description,
 	}
+	if repo.Status == "" {
+		switch status.Phase {
+		case wfv1.WorkflowSucceeded:
+			// from Argo Workflow
+			repo.Status = "success"
+		case wfv1.WorkflowFailed:
+			repo.Status = "failure"
+		default:
+			repo.Status = strings.ToLower(string(status.Phase))
+		}
+	}
+	if repo.Description == "" {
+		repo.Description = status.Message
+	}
 	if repo.PrNumber, err = strconv.Atoi(opt.Option.PR); err != nil {
 		err = fmt.Errorf("wrong pull-request number, %v", err)
 		return
 	}
+
+	fmt.Println("send status", repo)
+	var nodeResult *wfv1.NodeResult
 	if err = pkg.Reconcile(context.Background(), repo); err == nil {
-		resp = executor.ExecuteTemplateResponse{
-			Body: executor.ExecuteTemplateReply{
-				Node: &wfv1.NodeResult{
-					Phase:   wfv1.NodeSucceeded,
-					Message: "success",
-				},
-			},
+		nodeResult = &wfv1.NodeResult{
+			Phase:   wfv1.NodeSucceeded,
+			Message: "success",
 		}
 		fmt.Println("send success")
 	} else {
+		nodeResult = &wfv1.NodeResult{
+			Phase:   wfv1.NodeFailed,
+			Message: err.Error(),
+		}
 		fmt.Println("failed to send", err)
+	}
+
+	resp = executor.ExecuteTemplateResponse{
+		Body: executor.ExecuteTemplateReply{
+			Node: nodeResult,
+		},
 	}
 	return
 }
 
 type PluginExecutor interface {
 	// Execute commands based on the args provided from the workflow
-	Execute(args executor.ExecuteTemplateArgs) (executor.ExecuteTemplateResponse, error)
+	Execute(args executor.ExecuteTemplateArgs, status wfv1.WorkflowStatus) (executor.ExecuteTemplateResponse, error)
 }
 
 var (
@@ -134,7 +160,7 @@ var (
 	ErrExecutingPlugin  = errors.New("Error occured while executing plugin")
 )
 
-func plugin(p PluginExecutor, kubeClient kubernetes.Interface, namespace string) func(w http.ResponseWriter, req *http.Request) {
+func plugin(p PluginExecutor, client *wfclientset.Clientset) func(w http.ResponseWriter, req *http.Request) {
 	return func(w http.ResponseWriter, req *http.Request) {
 		if header := req.Header.Get("Content-Type"); header != "application/json" {
 			http.Error(w, ErrWrongContentType.Error(), http.StatusBadRequest)
@@ -147,13 +173,27 @@ func plugin(p PluginExecutor, kubeClient kubernetes.Interface, namespace string)
 			return
 		}
 
+		fmt.Println(string(body))
 		args := executor.ExecuteTemplateArgs{}
 		if err := json.Unmarshal(body, &args); err != nil || args.Workflow == nil || args.Template == nil {
 			http.Error(w, ErrMarshallingBody.Error(), http.StatusBadRequest)
 			return
 		}
 
-		resp, err := p.Execute(args)
+		wfName := args.Workflow.ObjectMeta.Name
+		wfNamespace := args.Workflow.ObjectMeta.Namespace
+
+		// find the Workflow
+		var workflow *wfv1.Workflow
+		if workflow, err = client.ArgoprojV1alpha1().Workflows(wfNamespace).Get(
+			context.Background(),
+			wfName,
+			v1.GetOptions{}); err != nil {
+			fmt.Println("failed to find workflow", wfName, wfNamespace, err)
+			return
+		}
+
+		resp, err := p.Execute(args, workflow.Status)
 		if err != nil {
 			fmt.Println("failed to execute plugin", err)
 			http.Error(w, ErrExecutingPlugin.Error(), http.StatusInternalServerError)
@@ -167,7 +207,7 @@ func plugin(p PluginExecutor, kubeClient kubernetes.Interface, namespace string)
 		}
 
 		w.WriteHeader(http.StatusOK)
-		w.Write(jsonResp)
+		_, _ = w.Write(jsonResp)
 		return
 	}
 }
