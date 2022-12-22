@@ -17,6 +17,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"time"
 )
 
 func main() {
@@ -115,6 +116,14 @@ func (e *DefaultPluginExecutor) Execute(args executor.ExecuteTemplateArgs, statu
 		default:
 			repo.Status = strings.ToLower(string(status.Phase))
 		}
+
+		// try to figure out if this is the final step
+		for _, node := range status.Nodes {
+			if node.Type == wfv1.NodeTypePlugin && strings.HasSuffix(node.Name, ".onExit") {
+				repo.Status = "success"
+				break
+			}
+		}
 	}
 	if repo.Description == "" {
 		repo.Description = status.Message
@@ -180,32 +189,34 @@ func plugin(p PluginExecutor, client *wfclientset.Clientset) func(w http.Respons
 			return
 		}
 
-		wfName := args.Workflow.ObjectMeta.Name
-		wfNamespace := args.Workflow.ObjectMeta.Namespace
+		go func(c *wfclientset.Clientset, args executor.ExecuteTemplateArgs) {
+			time.Sleep(3 * time.Second)
+			wfName := args.Workflow.ObjectMeta.Name
+			wfNamespace := args.Workflow.ObjectMeta.Namespace
 
-		// find the Workflow
-		var workflow *wfv1.Workflow
-		if workflow, err = client.ArgoprojV1alpha1().Workflows(wfNamespace).Get(
-			context.Background(),
-			wfName,
-			v1.GetOptions{}); err != nil {
-			fmt.Println("failed to find workflow", wfName, wfNamespace, err)
-			return
-		}
+			// find the Workflow
+			var workflow *wfv1.Workflow
+			if workflow, err = client.ArgoprojV1alpha1().Workflows(wfNamespace).Get(
+				context.Background(),
+				wfName,
+				v1.GetOptions{}); err != nil {
+				fmt.Println("failed to find workflow", wfName, wfNamespace, err)
+				return
+			}
 
-		resp, err := p.Execute(args, workflow.Status)
-		if err != nil {
-			fmt.Println("failed to execute plugin", err)
-			http.Error(w, ErrExecutingPlugin.Error(), http.StatusInternalServerError)
-			return
-		}
+			_, _ = p.Execute(args, workflow.Status)
+		}(client, args)
 
-		jsonResp, err := json.Marshal(resp.Body)
+		jsonResp, err := json.Marshal(executor.ExecuteTemplateReply{
+			Node: &wfv1.NodeResult{
+				Phase:   wfv1.NodeSucceeded,
+				Message: "success",
+			},
+		})
 		if err != nil {
 			fmt.Println("something went wrong", err)
 			http.Error(w, "something went wrong", http.StatusBadRequest)
 		}
-
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write(jsonResp)
 		return
