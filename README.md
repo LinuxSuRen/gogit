@@ -40,6 +40,8 @@ data:
     args:
     - --provider
     - gitlab
+    - --target
+    - http://argo.argo-server.svc:2746                        # should be an external address
     image: ghcr.io/linuxsuren/workflow-executor-gogit:master
     command:
     - workflow-executor-gogit
@@ -93,12 +95,10 @@ spec:
   - name: status
     plugin:
       gogit-executor-plugin:
-        description: success
-        label: test
         owner: linuxsuren
-        pr: "3"
         repo: test
-        status: success
+        pr: "3"
+        label: test
 ```
 
 ## TODO
