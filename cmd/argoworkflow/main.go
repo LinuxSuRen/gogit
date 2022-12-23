@@ -80,7 +80,7 @@ type pluginOption struct {
 	Option *option `json:"gogit-executor-plugin"`
 }
 
-func (e *DefaultPluginExecutor) Execute(args executor.ExecuteTemplateArgs, status wfv1.WorkflowStatus) (
+func (e *DefaultPluginExecutor) Execute(args executor.ExecuteTemplateArgs, name string, status wfv1.WorkflowStatus) (
 	resp executor.ExecuteTemplateResponse, err error) {
 	p := args.Template.Plugin.Value
 
@@ -103,8 +103,8 @@ func (e *DefaultPluginExecutor) Execute(args executor.ExecuteTemplateArgs, statu
 		Username:    opt.Option.Username,
 		Token:       opt.Option.Token,
 		Status:      opt.Option.Status,
-		Label:       opt.Option.Label,
-		Description: opt.Option.Description,
+		Label:       EmptyThen(opt.Option.Label, name),
+		Description: EmptyThen(opt.Option.Description, status.Message),
 	}
 	if repo.Status == "" {
 		switch status.Phase {
@@ -124,9 +124,6 @@ func (e *DefaultPluginExecutor) Execute(args executor.ExecuteTemplateArgs, statu
 				break
 			}
 		}
-	}
-	if repo.Description == "" {
-		repo.Description = status.Message
 	}
 	if repo.PrNumber, err = strconv.Atoi(opt.Option.PR); err != nil {
 		err = fmt.Errorf("wrong pull-request number, %v", err)
@@ -159,14 +156,13 @@ func (e *DefaultPluginExecutor) Execute(args executor.ExecuteTemplateArgs, statu
 
 type PluginExecutor interface {
 	// Execute commands based on the args provided from the workflow
-	Execute(args executor.ExecuteTemplateArgs, status wfv1.WorkflowStatus) (executor.ExecuteTemplateResponse, error)
+	Execute(args executor.ExecuteTemplateArgs, name string, status wfv1.WorkflowStatus) (executor.ExecuteTemplateResponse, error)
 }
 
 var (
 	ErrWrongContentType = errors.New("Content-Type header is not set to 'appliaction/json'")
 	ErrReadingBody      = errors.New("Couldn't read request body")
 	ErrMarshallingBody  = errors.New("Couldn't unmrashal request body")
-	ErrExecutingPlugin  = errors.New("Error occured while executing plugin")
 )
 
 func plugin(p PluginExecutor, client *wfclientset.Clientset) func(w http.ResponseWriter, req *http.Request) {
@@ -204,7 +200,11 @@ func plugin(p PluginExecutor, client *wfclientset.Clientset) func(w http.Respons
 				return
 			}
 
-			_, _ = p.Execute(args, workflow.Status)
+			var name string
+			if workflow.Spec.WorkflowTemplateRef != nil {
+				name = workflow.Spec.WorkflowTemplateRef.Name
+			}
+			_, _ = p.Execute(args, name, workflow.Status)
 		}(client, args)
 
 		jsonResp, err := json.Marshal(executor.ExecuteTemplateReply{
@@ -220,5 +220,14 @@ func plugin(p PluginExecutor, client *wfclientset.Clientset) func(w http.Respons
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write(jsonResp)
 		return
+	}
+}
+
+// EmptyThen return second if the first is empty
+func EmptyThen(first, second string) string {
+	if first == "" {
+		return second
+	} else {
+		return first
 	}
 }
