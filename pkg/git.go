@@ -41,7 +41,7 @@ func NewStatusMaker(repo, token string) *StatusMaker {
 		repo:  repo,
 		token: token,
 		expirationCheck: func(previousStatus *scm.Status, currentStatus *scm.StatusInput) bool {
-			return previousStatus.State == currentStatus.State
+			return previousStatus != nil && previousStatus.State == currentStatus.State
 		},
 	}
 }
