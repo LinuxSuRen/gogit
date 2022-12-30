@@ -9,6 +9,11 @@ import (
 
 // Reconcile is the main entry of this reconciler
 func Reconcile(ctx context.Context, repoInfo RepoInformation) (err error) {
+	if repoInfo.PrNumber == -1 {
+		fmt.Println("skip due to pr number is -1")
+		return
+	}
+
 	repo := repoInfo.getRepoPath()
 	maker := NewStatusMaker(repo, repoInfo.Token)
 	maker.WithTarget(repoInfo.Target).WithPR(repoInfo.PrNumber).
