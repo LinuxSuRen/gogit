@@ -7,10 +7,10 @@ import (
 	"strings"
 )
 
-func NewBuildCmd() (cmd *cobra.Command) {
-	opt := &option{}
+func newStatusCmd() (cmd *cobra.Command) {
+	opt := &statusOption{}
 	cmd = &cobra.Command{
-		Use:     "gogit",
+		Use:     "status",
 		Short:   "Send the build token to a PR of Gitlab/GitHub",
 		PreRunE: opt.preRunE,
 		RunE:    opt.runE,
@@ -40,7 +40,7 @@ func NewBuildCmd() (cmd *cobra.Command) {
 	return
 }
 
-func (o *option) preRunE(cmd *cobra.Command, args []string) (err error) {
+func (o *statusOption) preRunE(cmd *cobra.Command, args []string) (err error) {
 	if o.owner == "" {
 		o.owner = o.username
 	}
@@ -69,7 +69,7 @@ func (o *option) preRunE(cmd *cobra.Command, args []string) (err error) {
 	return
 }
 
-func (o *option) runE(cmd *cobra.Command, args []string) (err error) {
+func (o *statusOption) runE(cmd *cobra.Command, args []string) (err error) {
 	err = pkg.Reconcile(cmd.Context(), pkg.RepoInformation{
 		Provider:    o.provider,
 		Server:      o.server,
@@ -86,7 +86,7 @@ func (o *option) runE(cmd *cobra.Command, args []string) (err error) {
 	return
 }
 
-type option struct {
+type statusOption struct {
 	provider    string
 	server      string
 	username    string
