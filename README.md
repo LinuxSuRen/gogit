@@ -9,7 +9,7 @@
 Below is an example of sending build status to a private Gitlab server:
 
 ```shell
-gogit --provider gitlab \
+gogit status --provider gitlab \
   --server http://10.121.218.82:6080 \
   --repo yaml-readme \
   --pr 1 \
@@ -38,6 +38,7 @@ data:
   sidecar.automountServiceAccountToken: "true"
   sidecar.container: |
     args:
+    - status
     - --provider
     - gitlab
     - --target

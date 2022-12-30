@@ -1,0 +1,120 @@
+package cmd
+
+import (
+	"fmt"
+	"github.com/go-git/go-git/v5"
+	"github.com/go-git/go-git/v5/config"
+	"github.com/go-git/go-git/v5/plumbing"
+	"github.com/go-git/go-git/v5/plumbing/transport/ssh"
+	"github.com/spf13/cobra"
+	"os"
+	"path/filepath"
+)
+
+func newCheckoutCommand() (c *cobra.Command) {
+	opt := &checkoutOption{}
+
+	c = &cobra.Command{
+		Use:     "checkout",
+		Short:   "Clond and checkout the git repository with branch, tag, or pull request",
+		Example: "gogit checkout https://github.com/linuxsuren/gogit",
+		PreRunE: opt.preRunE,
+		RunE:    opt.runE,
+	}
+
+	flags := c.Flags()
+	flags.StringVarP(&opt.url, "url", "", "", "The git repository URL")
+	flags.StringVarP(&opt.remote, "remote", "", "origin", "The remote name")
+	flags.StringVarP(&opt.branch, "branch", "", "master", "The branch want to checkout")
+	flags.StringVarP(&opt.tag, "tag", "", "", "The tag want to checkout")
+	flags.IntVarP(&opt.pr, "pr", "", -1, "The pr number want to checkout, -1 means do nothing")
+	flags.StringVarP(&opt.target, "target", "", ".", "Clone git repository to the target path")
+	flags.StringVarP(&opt.versionOutput, "version-output", "", "", "Write the version to target file")
+	return
+}
+
+func (o *checkoutOption) preRunE(c *cobra.Command, args []string) (err error) {
+	if o.url == "" && len(args) > 0 {
+		o.url = args[0]
+	}
+	return
+}
+
+func (o *checkoutOption) runE(c *cobra.Command, args []string) (err error) {
+	var repoDir string
+	if repoDir, err = filepath.Abs(o.target); err != nil {
+		return
+	}
+	rsa := os.ExpandEnv("$HOME/.ssh/id_rsa")
+
+	var publicKeys *ssh.PublicKeys
+	if publicKeys, err = ssh.NewPublicKeysFromFile("git", rsa, ""); err != nil {
+		return
+	}
+
+	if _, err = git.PlainClone(repoDir, false, &git.CloneOptions{
+		RemoteName:    o.remote,
+		Auth:          publicKeys,
+		URL:           o.url,
+		ReferenceName: plumbing.NewBranchReferenceName(o.branch),
+		Progress:      c.OutOrStdout(),
+	}); err != nil {
+		err = fmt.Errorf("failed to clone git repository '%s' into '%s', error: %v", o.url, repoDir, err)
+		return
+	}
+
+	var repo *git.Repository
+	if repo, err = git.PlainOpen(repoDir); err == nil {
+		var wd *git.Worktree
+
+		if wd, err = repo.Worktree(); err == nil {
+			if o.tag != "" {
+				if err = wd.Checkout(&git.CheckoutOptions{
+					Branch: plumbing.NewTagReferenceName(o.tag),
+				}); err != nil {
+					err = fmt.Errorf("unable to checkout git branch: %s, error: %v", o.tag, err)
+					return
+				}
+			}
+
+			if o.pr > 0 {
+				// TODO add GitHub support, see also https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/reviewing-changes-in-pull-requests/checking-out-pull-requests-locally?gt
+				if err = repo.Fetch(&git.FetchOptions{
+					RemoteName: o.remote,
+					Auth:       publicKeys,
+					Progress:   c.OutOrStdout(),
+					RefSpecs:   []config.RefSpec{config.RefSpec(fmt.Sprintf("refs/merge-requests/%d/head:mr-%d", o.pr, o.pr))},
+				}); err != nil && err != git.NoErrAlreadyUpToDate {
+					err = fmt.Errorf("failed to fetch '%s', error: %v", o.remote, err)
+					return
+				}
+
+				if err = wd.Checkout(&git.CheckoutOptions{
+					Create: true,
+					Branch: plumbing.NewBranchReferenceName(fmt.Sprintf("mr-%d", o.pr)),
+				}); err != nil {
+					err = fmt.Errorf("unable to checkout git branch: %s, error: %v", o.tag, err)
+					return
+				}
+			}
+
+			var head *plumbing.Reference
+			if head, err = repo.Head(); err == nil {
+				if o.versionOutput != "" {
+					os.WriteFile(o.versionOutput, []byte(head.Name().Short()), 0444)
+				}
+			}
+		}
+	}
+	return
+}
+
+type checkoutOption struct {
+	url           string
+	remote        string
+	branch        string
+	tag           string
+	pr            int
+	target        string
+	versionOutput string
+}

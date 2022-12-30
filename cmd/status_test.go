@@ -10,7 +10,7 @@ import (
 func TestStatus(t *testing.T) {
 	tests := []struct {
 		name         string
-		opt          *option
+		opt          *statusOption
 		status       string
 		expectStatus string
 	}{{
@@ -25,7 +25,7 @@ func TestStatus(t *testing.T) {
 	for i := range tests {
 		tt := tests[i]
 		t.Run(tt.name, func(t *testing.T) {
-			opt := &option{status: tt.status}
+			opt := &statusOption{status: tt.status}
 			_ = opt.preRunE(nil, nil)
 			assert.Equal(t, tt.expectStatus, opt.status)
 		})
@@ -35,7 +35,7 @@ func TestStatus(t *testing.T) {
 func TestTokenFromFile(t *testing.T) {
 	tests := []struct {
 		name    string
-		opt     *option
+		opt     *statusOption
 		token   string
 		prepare func() string
 		expect  string
@@ -55,7 +55,7 @@ func TestTokenFromFile(t *testing.T) {
 	for i := range tests {
 		tt := tests[i]
 		t.Run(tt.name, func(t *testing.T) {
-			opt := &option{token: tt.token}
+			opt := &statusOption{token: tt.token}
 			if tt.prepare != nil {
 				token := tt.prepare()
 				opt.token = "file://" + token
@@ -70,8 +70,8 @@ func TestTokenFromFile(t *testing.T) {
 }
 
 func TestFlags(t *testing.T) {
-	cmd := NewBuildCmd()
-	assert.Equal(t, "gogit", cmd.Use)
+	cmd := newStatusCmd()
+	assert.Equal(t, "status", cmd.Use)
 	flags := cmd.Flags()
 	assert.NotNil(t, flags.Lookup("provider"))
 	assert.NotNil(t, flags.Lookup("server"))

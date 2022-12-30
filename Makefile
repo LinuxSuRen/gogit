@@ -1,5 +1,7 @@
 build:
 	CGO_ENABLE=0 go build -ldflags "-w -s" -o bin/gogit
+copy: build
+	cp bin/gogit /usr/local/bin
 test:
 	go test ./... -coverprofile coverage.out
 goreleaser:
