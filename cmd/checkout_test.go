@@ -1,8 +1,9 @@
 package cmd
 
 import (
-	"github.com/stretchr/testify/assert"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func Test_prRef(t *testing.T) {
@@ -69,4 +70,17 @@ func Test_detectGitKind(t *testing.T) {
 			assert.Equalf(t, tt.wantKind, detectGitKind(tt.args.gitURL), "detectGitKind(%v)", tt.args.gitURL)
 		})
 	}
+}
+
+func TestGetAuth(t *testing.T) {
+	opt := &checkoutOption{
+		sshPrivateKey: "/tmp",
+	}
+	auth, err := opt.getAuth("git@fake.com")
+	assert.Nil(t, auth)
+	assert.NotNil(t, err)
+
+	auth, err = opt.getAuth("fake.com")
+	assert.Nil(t, auth)
+	assert.Nil(t, err)
 }
