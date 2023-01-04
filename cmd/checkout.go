@@ -2,14 +2,16 @@ package cmd
 
 import (
 	"fmt"
-	"github.com/go-git/go-git/v5"
-	"github.com/go-git/go-git/v5/config"
-	"github.com/go-git/go-git/v5/plumbing"
-	"github.com/go-git/go-git/v5/plumbing/transport/ssh"
-	"github.com/spf13/cobra"
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/go-git/go-git/v5"
+	"github.com/go-git/go-git/v5/config"
+	"github.com/go-git/go-git/v5/plumbing"
+	"github.com/go-git/go-git/v5/plumbing/transport"
+	"github.com/go-git/go-git/v5/plumbing/transport/ssh"
+	"github.com/spf13/cobra"
 )
 
 func newCheckoutCommand() (c *cobra.Command) {
@@ -47,17 +49,16 @@ func (o *checkoutOption) runE(c *cobra.Command, args []string) (err error) {
 	if repoDir, err = filepath.Abs(o.target); err != nil {
 		return
 	}
-	rsa := os.ExpandEnv("$HOME/.ssh/id_rsa")
 
-	var publicKeys *ssh.PublicKeys
-	if publicKeys, err = ssh.NewPublicKeysFromFile("git", rsa, ""); err != nil {
+	var gitAuth transport.AuthMethod
+	if gitAuth, err = getAuth(o.url); err != nil {
 		return
 	}
 
 	if _, serr := os.Stat(filepath.Join(repoDir, ".git")); serr != nil {
 		if _, err = git.PlainClone(repoDir, false, &git.CloneOptions{
 			RemoteName:    o.remote,
-			Auth:          publicKeys,
+			Auth:          gitAuth,
 			URL:           o.url,
 			ReferenceName: plumbing.NewBranchReferenceName(o.branch),
 			Progress:      c.OutOrStdout(),
@@ -76,7 +77,12 @@ func (o *checkoutOption) runE(c *cobra.Command, args []string) (err error) {
 			return
 		}
 
-		kind := detectGitKind(remotes[0].Config().URLs[0])
+		remoteURL := remotes[0].Config().URLs[0]
+		kind := detectGitKind(remoteURL)
+		// need to get auth again if the repo was exist
+		if gitAuth, err = getAuth(remoteURL); err != nil {
+			return
+		}
 
 		if wd, err = repo.Worktree(); err == nil {
 			if o.tag != "" {
@@ -89,10 +95,9 @@ func (o *checkoutOption) runE(c *cobra.Command, args []string) (err error) {
 			}
 
 			if o.pr > 0 {
-				// TODO add GitHub support, see also https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/reviewing-changes-in-pull-requests/checking-out-pull-requests-locally?gt
 				if err = repo.Fetch(&git.FetchOptions{
 					RemoteName: o.remote,
-					Auth:       publicKeys,
+					Auth:       gitAuth,
 					Progress:   c.OutOrStdout(),
 					RefSpecs:   []config.RefSpec{config.RefSpec(prRef(o.pr, kind))},
 				}); err != nil && err != git.NoErrAlreadyUpToDate {
@@ -120,6 +125,14 @@ func (o *checkoutOption) runE(c *cobra.Command, args []string) (err error) {
 	return
 }
 
+func getAuth(remote string) (auth transport.AuthMethod, err error) {
+	if strings.HasPrefix(remote, "git@") {
+		rsa := os.ExpandEnv("$HOME/.ssh/id_rsa")
+		auth, err = ssh.NewPublicKeysFromFile("git", rsa, "")
+	}
+	return
+}
+
 func detectGitKind(gitURL string) (kind string) {
 	kind = "gitlab"
 	if strings.Contains(gitURL, "github.com") {
@@ -128,6 +141,7 @@ func detectGitKind(gitURL string) (kind string) {
 	return
 }
 
+// see also https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/reviewing-changes-in-pull-requests/checking-out-pull-requests-locally?gt
 func prRef(pr int, kind string) (ref string) {
 	switch kind {
 	case "gitlab":
