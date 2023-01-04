@@ -9,6 +9,7 @@ import (
 	"github.com/spf13/cobra"
 	"os"
 	"path/filepath"
+	"strings"
 )
 
 func newCheckoutCommand() (c *cobra.Command) {
@@ -16,7 +17,8 @@ func newCheckoutCommand() (c *cobra.Command) {
 
 	c = &cobra.Command{
 		Use:     "checkout",
-		Short:   "Clond and checkout the git repository with branch, tag, or pull request",
+		Aliases: []string{"co"},
+		Short:   "Clone and checkout the git repository with branch, tag, or pull request",
 		Example: "gogit checkout https://github.com/linuxsuren/gogit",
 		PreRunE: opt.preRunE,
 		RunE:    opt.runE,
@@ -52,20 +54,29 @@ func (o *checkoutOption) runE(c *cobra.Command, args []string) (err error) {
 		return
 	}
 
-	if _, err = git.PlainClone(repoDir, false, &git.CloneOptions{
-		RemoteName:    o.remote,
-		Auth:          publicKeys,
-		URL:           o.url,
-		ReferenceName: plumbing.NewBranchReferenceName(o.branch),
-		Progress:      c.OutOrStdout(),
-	}); err != nil {
-		err = fmt.Errorf("failed to clone git repository '%s' into '%s', error: %v", o.url, repoDir, err)
-		return
+	if _, serr := os.Stat(filepath.Join(repoDir, ".git")); serr != nil {
+		if _, err = git.PlainClone(repoDir, false, &git.CloneOptions{
+			RemoteName:    o.remote,
+			Auth:          publicKeys,
+			URL:           o.url,
+			ReferenceName: plumbing.NewBranchReferenceName(o.branch),
+			Progress:      c.OutOrStdout(),
+		}); err != nil {
+			err = fmt.Errorf("failed to clone git repository '%s' into '%s', error: %v", o.url, repoDir, err)
+			return
+		}
 	}
 
 	var repo *git.Repository
 	if repo, err = git.PlainOpen(repoDir); err == nil {
 		var wd *git.Worktree
+		var remotes []*git.Remote
+
+		if remotes, err = repo.Remotes(); err != nil {
+			return
+		}
+
+		kind := detectGitKind(remotes[0].Config().URLs[0])
 
 		if wd, err = repo.Worktree(); err == nil {
 			if o.tag != "" {
@@ -83,7 +94,7 @@ func (o *checkoutOption) runE(c *cobra.Command, args []string) (err error) {
 					RemoteName: o.remote,
 					Auth:       publicKeys,
 					Progress:   c.OutOrStdout(),
-					RefSpecs:   []config.RefSpec{config.RefSpec(fmt.Sprintf("refs/merge-requests/%d/head:mr-%d", o.pr, o.pr))},
+					RefSpecs:   []config.RefSpec{config.RefSpec(prRef(o.pr, kind))},
 				}); err != nil && err != git.NoErrAlreadyUpToDate {
 					err = fmt.Errorf("failed to fetch '%s', error: %v", o.remote, err)
 					return
@@ -91,8 +102,8 @@ func (o *checkoutOption) runE(c *cobra.Command, args []string) (err error) {
 
 				if err = wd.Checkout(&git.CheckoutOptions{
 					Create: true,
-					Branch: plumbing.NewBranchReferenceName(fmt.Sprintf("mr-%d", o.pr)),
-				}); err != nil {
+					Branch: plumbing.NewBranchReferenceName(fmt.Sprintf("pr-%d", o.pr)),
+				}); err != nil && !strings.Contains(err.Error(), "already exists") {
 					err = fmt.Errorf("unable to checkout git branch: %s, error: %v", o.tag, err)
 					return
 				}
@@ -101,10 +112,28 @@ func (o *checkoutOption) runE(c *cobra.Command, args []string) (err error) {
 			var head *plumbing.Reference
 			if head, err = repo.Head(); err == nil {
 				if o.versionOutput != "" {
-					os.WriteFile(o.versionOutput, []byte(head.Name().Short()), 0444)
+					err = os.WriteFile(o.versionOutput, []byte(head.Name().Short()), 0444)
 				}
 			}
 		}
+	}
+	return
+}
+
+func detectGitKind(gitURL string) (kind string) {
+	kind = "gitlab"
+	if strings.Contains(gitURL, "github.com") {
+		kind = "github"
+	}
+	return
+}
+
+func prRef(pr int, kind string) (ref string) {
+	switch kind {
+	case "gitlab":
+		ref = fmt.Sprintf("refs/merge-requests/%d/head:pr-%d", pr, pr)
+	case "github":
+		ref = fmt.Sprintf("refs/pull/%d/head:pr-%d", pr, pr)
 	}
 	return
 }
