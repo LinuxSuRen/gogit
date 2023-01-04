@@ -4,6 +4,7 @@ copy: build
 	cp bin/gogit /usr/local/bin
 test:
 	go test ./... -coverprofile coverage.out
+pre-commit: test
 goreleaser:
 	goreleaser build --snapshot --rm-dist
 image:

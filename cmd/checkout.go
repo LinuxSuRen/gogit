@@ -85,11 +85,22 @@ func (o *checkoutOption) runE(c *cobra.Command, args []string) (err error) {
 		}
 
 		if wd, err = repo.Worktree(); err == nil {
+			if c.Flags().Changed("branch") {
+				c.Printf("Switched to branch '%s'\n", o.branch)
+
+				if err = wd.Checkout(&git.CheckoutOptions{
+					Branch: plumbing.NewBranchReferenceName(o.branch),
+				}); err != nil {
+					err = fmt.Errorf("unable to checkout git branch: %s, error: %v", o.branch, err)
+					return
+				}
+			}
+
 			if o.tag != "" {
 				if err = wd.Checkout(&git.CheckoutOptions{
 					Branch: plumbing.NewTagReferenceName(o.tag),
 				}); err != nil {
-					err = fmt.Errorf("unable to checkout git branch: %s, error: %v", o.tag, err)
+					err = fmt.Errorf("unable to checkout git tag: %s, error: %v", o.tag, err)
 					return
 				}
 			}
