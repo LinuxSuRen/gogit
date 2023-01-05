@@ -6,6 +6,17 @@
 * Gitlab (public or private)
 
 ## Usage
+
+### Checkout to branch or PR
+Ideally, `gogit` could checkout to your branch or PR in any kind of git repository.
+
+You can run the following command in a git repository directory:
+
+```shell
+gogit checkout --pr 1
+```
+
+### Send status to Git Provider
 Below is an example of sending build status to a private Gitlab server:
 
 ```shell
