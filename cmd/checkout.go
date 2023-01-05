@@ -31,9 +31,9 @@ func newCheckoutCommand() (c *cobra.Command) {
 	flags.StringVarP(&opt.remote, "remote", "", "origin", "The remote name")
 	flags.StringVarP(&opt.sshPrivateKey, "ssh-private-key", "", "$HOME/.ssh/id_rsa",
 		"The SSH private key file path")
-	flags.StringVarP(&opt.branch, "branch", "", "master", "The branch want to checkout")
+	flags.StringVarP(&opt.branch, "branch", "b", "master", "The branch want to checkout. It could be a short name or fullname. Such as master or refs/heads/master")
 	flags.StringVarP(&opt.tag, "tag", "", "", "The tag want to checkout")
-	flags.IntVarP(&opt.pr, "pr", "", -1, "The pr number want to checkout, -1 means do nothing")
+	flags.IntVarP(&opt.pr, "pr", "p", -1, "The pr number want to checkout, -1 means do nothing")
 	flags.StringVarP(&opt.target, "target", "", ".", "Clone git repository to the target path")
 	flags.StringVarP(&opt.versionOutput, "version-output", "", "", "Write the version to target file")
 	return
@@ -43,6 +43,7 @@ func (o *checkoutOption) preRunE(c *cobra.Command, args []string) (err error) {
 	if o.url == "" && len(args) > 0 {
 		o.url = args[0]
 	}
+	o.branch = strings.TrimPrefix(o.branch, "refs/heads/")
 	return
 }
 

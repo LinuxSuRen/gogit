@@ -84,3 +84,50 @@ func TestGetAuth(t *testing.T) {
 	assert.Nil(t, auth)
 	assert.Nil(t, err)
 }
+
+func TestPreRunE(t *testing.T) {
+	const sampleGit = "https://github.com/linuxsuren/gogit"
+	const anotherGit = "https://github.com/linuxsuren/gogit.git"
+
+	tests := []struct {
+		name      string
+		opt       *checkoutOption
+		args      []string
+		expectErr bool
+		verify    func(t *testing.T, opt *checkoutOption)
+	}{{
+		name:      "url is empty",
+		opt:       &checkoutOption{},
+		args:      []string{sampleGit},
+		expectErr: false,
+		verify: func(t *testing.T, opt *checkoutOption) {
+			assert.Equal(t, sampleGit, opt.url)
+		},
+	}, {
+		name:      "url is not empty",
+		opt:       &checkoutOption{url: anotherGit},
+		args:      []string{sampleGit},
+		expectErr: false,
+		verify: func(t *testing.T, opt *checkoutOption) {
+			assert.Equal(t, anotherGit, opt.url)
+		},
+	}, {
+		name:      "branch is fullname",
+		opt:       &checkoutOption{branch: "refs/heads/master"},
+		expectErr: false,
+		verify: func(t *testing.T, opt *checkoutOption) {
+			assert.Equal(t, "master", opt.branch)
+		},
+	}}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := tt.opt.preRunE(nil, tt.args)
+			if tt.expectErr {
+				assert.NotNil(t, err)
+			} else {
+				assert.Nil(t, err)
+			}
+			tt.verify(t, tt.opt)
+		})
+	}
+}
