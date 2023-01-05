@@ -1,10 +1,11 @@
 FROM golang:1.18 as builder
+ARG GOPROXY=direct
 
 WORKDIR /workspace
 COPY . .
 
 RUN go mod download
-RUN CGO_ENABLE=0 go build -ldflags "-w -s" -o workflow-executor-gogit
+RUN GOPROXY=${GOPROXY} CGO_ENABLE=0 go build -ldflags "-w -s" -o workflow-executor-gogit
 
 FROM ubuntu:kinetic
 

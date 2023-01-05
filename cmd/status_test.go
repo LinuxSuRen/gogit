@@ -1,10 +1,11 @@
 package cmd
 
 import (
-	"github.com/stretchr/testify/assert"
 	"io"
 	"os"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestStatus(t *testing.T) {
@@ -55,7 +56,7 @@ func TestTokenFromFile(t *testing.T) {
 	for i := range tests {
 		tt := tests[i]
 		t.Run(tt.name, func(t *testing.T) {
-			opt := &statusOption{token: tt.token}
+			opt := &statusOption{gitProviderOption: gitProviderOption{token: tt.token}}
 			if tt.prepare != nil {
 				token := tt.prepare()
 				opt.token = "file://" + token

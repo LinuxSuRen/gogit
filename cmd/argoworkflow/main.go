@@ -5,19 +5,21 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	wfv1 "github.com/argoproj/argo-workflows/v3/pkg/apis/workflow/v1alpha1"
-	wfclientset "github.com/argoproj/argo-workflows/v3/pkg/client/clientset/versioned"
-	"github.com/argoproj/argo-workflows/v3/pkg/plugins/executor"
-	"github.com/linuxsuren/gogit/pkg"
-	"github.com/spf13/cobra"
 	"io"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/rest"
 	"net/http"
 	"os"
 	"strconv"
 	"strings"
 	"time"
+
+	wfv1 "github.com/argoproj/argo-workflows/v3/pkg/apis/workflow/v1alpha1"
+	wfclientset "github.com/argoproj/argo-workflows/v3/pkg/client/clientset/versioned"
+	"github.com/argoproj/argo-workflows/v3/pkg/plugins/executor"
+	"github.com/linuxsuren/gogit/argoworkflow/template"
+	"github.com/linuxsuren/gogit/pkg"
+	"github.com/spf13/cobra"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/rest"
 )
 
 func main() {
@@ -39,6 +41,8 @@ func main() {
 		"The root URL of Argo Workflows UI")
 	flags.IntVarP(&opt.Port, "port", "", 3001,
 		"The port of the HTTP server")
+	flags.BoolVarP(&opt.CreateComment, "create-comment", "", false, "Indicate if want to create a status comment")
+	flags.StringVarP(&opt.CommentTemplate, "comment-template", "", "", "The template of the comment")
 	if err := cmd.Execute(); err != nil {
 		os.Exit(1)
 	}
@@ -63,6 +67,9 @@ type option struct {
 	Token    string
 	Port     int
 
+	CreateComment   bool
+	CommentTemplate string
+
 	Owner       string
 	Repo        string
 	PR          string
@@ -80,8 +87,15 @@ type pluginOption struct {
 	Option *option `json:"gogit-executor-plugin"`
 }
 
-func (e *DefaultPluginExecutor) Execute(args executor.ExecuteTemplateArgs, name string, status wfv1.WorkflowStatus) (
+func (e *DefaultPluginExecutor) Execute(args executor.ExecuteTemplateArgs, wf *wfv1.Workflow) (
 	resp executor.ExecuteTemplateResponse, err error) {
+	ctx := context.Background()
+	var name string
+	if wf.Spec.WorkflowTemplateRef != nil {
+		name = wf.Spec.WorkflowTemplateRef.Name
+	}
+	status := wf.Status
+
 	p := args.Template.Plugin.Value
 
 	opt := &pluginOption{Option: e.option}
@@ -132,18 +146,58 @@ func (e *DefaultPluginExecutor) Execute(args executor.ExecuteTemplateArgs, name 
 
 	fmt.Println("send status", repo)
 	var nodeResult *wfv1.NodeResult
-	if err = pkg.Reconcile(context.Background(), repo); err == nil {
+	if err = pkg.CreateStatus(ctx, repo); err == nil {
 		nodeResult = &wfv1.NodeResult{
 			Phase:   wfv1.NodeSucceeded,
 			Message: "success",
 		}
-		fmt.Println("send success")
+		fmt.Println("send status success")
 	} else {
+		fmt.Println("failed to send status", err)
+	}
+
+	if err == nil && opt.Option.CreateComment {
+		fmt.Println("start to create comment")
+		tplText := EmptyThen(opt.Option.CommentTemplate, template.CommentTemplate)
+
+		// find useless nodes
+		var toRemoves []string
+		for key, val := range wf.Status.Nodes {
+			if strings.HasSuffix(val.Name, ".onExit") || strings.Contains(val.Name, ".hooks.") {
+				toRemoves = append(toRemoves, key)
+			}
+		}
+		wf.Status.Phase = wfv1.WorkflowPhase(wf.Status.Nodes[wf.Name].Phase)
+		// remove useless nodes
+		delete(wf.Status.Nodes, wf.Name)
+		for _, key := range toRemoves {
+			delete(wf.Status.Nodes, key)
+		}
+
+		// put the workflow link into annotations
+		if wf.Annotations == nil {
+			wf.Annotations = map[string]string{}
+		}
+		wf.Annotations["workflow.link"] = targetAddress
+
+		var message string
+		message, err = template.RenderTemplate(tplText, wf)
+		if err == nil {
+			err = pkg.CreateComment(ctx, repo, message)
+		} else {
+			err = fmt.Errorf("failed to render comment template: %v", err)
+		}
+
+		if err != nil {
+			fmt.Println("failed to create comment", err)
+		}
+	}
+
+	if err != nil {
 		nodeResult = &wfv1.NodeResult{
 			Phase:   wfv1.NodeFailed,
 			Message: err.Error(),
 		}
-		fmt.Println("failed to send", err)
 	}
 
 	resp = executor.ExecuteTemplateResponse{
@@ -156,7 +210,7 @@ func (e *DefaultPluginExecutor) Execute(args executor.ExecuteTemplateArgs, name 
 
 type PluginExecutor interface {
 	// Execute commands based on the args provided from the workflow
-	Execute(args executor.ExecuteTemplateArgs, name string, status wfv1.WorkflowStatus) (executor.ExecuteTemplateResponse, error)
+	Execute(args executor.ExecuteTemplateArgs, wf *wfv1.Workflow) (executor.ExecuteTemplateResponse, error)
 }
 
 var (
@@ -200,11 +254,7 @@ func plugin(p PluginExecutor, client *wfclientset.Clientset) func(w http.Respons
 				return
 			}
 
-			var name string
-			if workflow.Spec.WorkflowTemplateRef != nil {
-				name = workflow.Spec.WorkflowTemplateRef.Name
-			}
-			_, _ = p.Execute(args, name, workflow.Status)
+			_, _ = p.Execute(args, workflow)
 		}(client, args)
 
 		jsonResp, err := json.Marshal(executor.ExecuteTemplateReply{
