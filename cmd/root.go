@@ -10,6 +10,6 @@ func NewRootCommand() (c *cobra.Command) {
 	}
 
 	c.AddCommand(newCheckoutCommand(),
-		newStatusCmd())
+		newStatusCmd(), newCommentCommand())
 	return
 }

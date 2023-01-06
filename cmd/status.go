@@ -1,10 +1,12 @@
 package cmd
 
 import (
-	"github.com/linuxsuren/gogit/pkg"
-	"github.com/spf13/cobra"
 	"os"
 	"strings"
+
+	"github.com/linuxsuren/gogit/pkg"
+	"github.com/spf13/cobra"
+	flag "github.com/spf13/pflag"
 )
 
 func newStatusCmd() (cmd *cobra.Command) {
@@ -17,14 +19,7 @@ func newStatusCmd() (cmd *cobra.Command) {
 	}
 
 	flags := cmd.Flags()
-	flags.StringVarP(&opt.provider, "provider", "p", "github", "The provider of git, such as: gitlab, github")
-	flags.StringVarP(&opt.server, "server", "s", "", "The server address of target git provider, only need when it's a private provider")
-	flags.StringVarP(&opt.owner, "owner", "o", "", "Owner of a git repository")
-	flags.StringVarP(&opt.repo, "repo", "r", "", "Name of target git repository")
-	flags.IntVarP(&opt.pr, "pr", "", 1, "The pull request number")
-	flags.StringVarP(&opt.username, "username", "u", "", "Username of the git repository")
-	flags.StringVarP(&opt.token, "token", "t", "",
-		"The access token of the git repository. Or you could provide a file path, such as: file:///var/token")
+	opt.addFlags(flags)
 	flags.StringVarP(&opt.status, "status", "", "",
 		"Build token, such as: pending, success, cancelled, error")
 	flags.StringVarP(&opt.target, "target", "", "https://github.com/LinuxSuRen/gogit", "Address of the build server")
@@ -41,9 +36,7 @@ func newStatusCmd() (cmd *cobra.Command) {
 }
 
 func (o *statusOption) preRunE(cmd *cobra.Command, args []string) (err error) {
-	if o.owner == "" {
-		o.owner = o.username
-	}
+	o.preHandle()
 	if o.label == "" {
 		o.label = "gogit"
 	}
@@ -70,7 +63,7 @@ func (o *statusOption) preRunE(cmd *cobra.Command, args []string) (err error) {
 }
 
 func (o *statusOption) runE(cmd *cobra.Command, args []string) (err error) {
-	err = pkg.Reconcile(cmd.Context(), pkg.RepoInformation{
+	err = pkg.CreateStatus(cmd.Context(), pkg.RepoInformation{
 		Provider:    o.provider,
 		Server:      o.server,
 		Owner:       o.owner,
@@ -86,14 +79,35 @@ func (o *statusOption) runE(cmd *cobra.Command, args []string) (err error) {
 	return
 }
 
+type gitProviderOption struct {
+	provider string
+	server   string
+	username string
+	token    string
+	owner    string
+	repo     string
+	pr       int
+}
+
+func (o *gitProviderOption) addFlags(flags *flag.FlagSet) {
+	flags.StringVarP(&o.provider, "provider", "p", "github", "The provider of git, such as: gitlab, github")
+	flags.StringVarP(&o.server, "server", "s", "", "The server address of target git provider, only need when it's a private provider")
+	flags.StringVarP(&o.owner, "owner", "o", "", "Owner of a git repository")
+	flags.StringVarP(&o.repo, "repo", "r", "", "Name of target git repository")
+	flags.IntVarP(&o.pr, "pr", "", 1, "The pull request number")
+	flags.StringVarP(&o.username, "username", "u", "", "Username of the git repository")
+	flags.StringVarP(&o.token, "token", "t", "",
+		"The access token of the git repository. Or you could provide a file path, such as: file:///var/token")
+}
+
+func (o *gitProviderOption) preHandle() {
+	if o.owner == "" {
+		o.owner = o.username
+	}
+}
+
 type statusOption struct {
-	provider    string
-	server      string
-	username    string
-	token       string
-	owner       string
-	repo        string
-	pr          int
+	gitProviderOption
 	status      string
 	target      string
 	label       string

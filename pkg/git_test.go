@@ -2,9 +2,10 @@ package pkg
 
 import (
 	"context"
+	"testing"
+
 	"github.com/jenkins-x/go-scm/scm"
 	"github.com/stretchr/testify/assert"
-	"testing"
 )
 
 func TestReconcile(t *testing.T) {
@@ -27,7 +28,7 @@ func TestReconcile(t *testing.T) {
 	}}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if err := Reconcile(tt.args.ctx, tt.args.repoInfo); (err != nil) != tt.wantErr {
+			if err := NewMaker(tt.args.ctx, tt.args.repoInfo); (err != nil) != tt.wantErr {
 				t.Errorf("Reconcile() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
