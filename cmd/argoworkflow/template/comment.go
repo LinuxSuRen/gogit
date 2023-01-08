@@ -2,7 +2,7 @@ package template
 
 // CommentTemplate is the default comment template
 const CommentTemplate = `
-{{.Spec.WorkflowTemplateRef.Name}} is {{.Status.Phase}}. It takes {{duration .Status.FinishedAt .Status.StartedAt}}. Please check log output from [here]({{get .Annotations "workflow.link"}}).
+[{{.Spec.WorkflowTemplateRef.Name}}]({{get .Annotations "workflow.templatelink"}}) is {{.Status.Phase}}. It takes {{duration .Status.FinishedAt .Status.StartedAt}}. Please check log output from [here]({{get .Annotations "workflow.link"}}).
 
 | Stage | Status | Duration |
 |---|---|---|

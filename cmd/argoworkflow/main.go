@@ -180,7 +180,20 @@ func (e *DefaultPluginExecutor) Execute(args executor.ExecuteTemplateArgs, wf *w
 		if wf.Annotations == nil {
 			wf.Annotations = map[string]string{}
 		}
+
+		var templatePath string
+		if wf.Spec.WorkflowTemplateRef.ClusterScope {
+			templatePath = "cluster-workflow-templates"
+		} else {
+			templatePath = "workflow-templates"
+		}
+		targetTemplateAddress := fmt.Sprintf("%s/%s/%s/%s",
+			opt.Option.Target,
+			templatePath,
+			args.Workflow.ObjectMeta.Namespace,
+			wf.Spec.WorkflowTemplateRef.Name)
 		wf.Annotations["workflow.link"] = targetAddress
+		wf.Annotations["workflow.templatelink"] = targetTemplateAddress
 
 		var message string
 		message, err = template.RenderTemplate(tplText, wf)
