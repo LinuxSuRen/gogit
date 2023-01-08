@@ -19,6 +19,7 @@ func newCommentCommand() (c *cobra.Command) {
 	flags := c.Flags()
 	opt.addFlags(flags)
 	flags.StringVarP(&opt.message, "message", "m", "", "The comment body")
+	flags.StringVarP(&opt.identity, "identity", "", pkg.CommentEndMarker, "The identity for matching exiting comment")
 	return
 }
 
@@ -31,7 +32,7 @@ func (o *commentOption) runE(c *cobra.Command, args []string) (err error) {
 		PrNumber: o.pr,
 		Username: o.username,
 		Token:    o.token,
-	}, o.message)
+	}, o.message, o.identity)
 	return
 }
 
@@ -42,5 +43,6 @@ func (o *commentOption) preRunE(c *cobra.Command, args []string) (err error) {
 
 type commentOption struct {
 	gitProviderOption
-	message string
+	message  string
+	identity string
 }

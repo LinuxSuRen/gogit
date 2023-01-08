@@ -20,9 +20,9 @@ func CreateStatus(ctx context.Context, repoInfo RepoInformation) (err error) {
 // CreateComment creates a comment against the pull request
 //
 // It will update the comment there is a comment has the same ender
-func CreateComment(ctx context.Context, repoInfo RepoInformation, message string) (err error) {
+func CreateComment(ctx context.Context, repoInfo RepoInformation, message, identity string) (err error) {
 	if maker := NewMaker(ctx, repoInfo); maker != nil {
-		err = maker.CreateComment(ctx, message)
+		err = maker.CreateComment(ctx, message, identity)
 	}
 	return
 }
@@ -113,16 +113,17 @@ func (s *StatusMaker) WithPR(pr int) *StatusMaker {
 	return s
 }
 
+// CommentEndMarker is the identify for matching existing comment
+const CommentEndMarker = "Comment from [gogit](https://github.com/linuxsuren/gogit)."
+
 // CreateComment creates a comment
-func (s *StatusMaker) CreateComment(ctx context.Context, message string) (err error) {
+func (s *StatusMaker) CreateComment(ctx context.Context, message, endMarker string) (err error) {
 	var scmClient *scm.Client
 	if scmClient, err = factory.NewClient(s.provider, s.server, s.token, func(c *scm.Client) {
 		c.Username = s.username
 	}); err != nil {
 		return
 	}
-
-	const endMarker = "Comment from [gogit](https://github.com/linuxsuren/gogit)."
 
 	var comments []*scm.Comment
 	if comments, _, err = scmClient.PullRequests.ListComments(ctx, s.repo, s.pr, &scm.ListOptions{

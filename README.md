@@ -36,7 +36,8 @@ Or in the following use cases:
 
 Install as an Argo workflow executor plugin:
 
-```yaml
+```shell
+cat <<EOF | kubectl apply -f -
 ---
 apiVersion: v1
 kind: ServiceAccount
@@ -54,6 +55,7 @@ data:
     - gitlab
     - --target
     - http://argo.argo-server.svc:2746                        # should be an external address
+    - --create-comment=true                                   # create a comment to show the status of Workflow
     image: ghcr.io/linuxsuren/workflow-executor-gogit:master
     command:
     - workflow-executor-gogit
@@ -78,10 +80,12 @@ metadata:
     workflows.argoproj.io/configmap-type: ExecutorPlugin
   name: gogit-executor-plugin
   namespace: argo
+EOF
 ```
 
 then, create a WorkflowTemplate:
-```yaml
+```shell
+cat <<EOF | kubectl apply -f -
 apiVersion: argoproj.io/v1alpha1
 kind: WorkflowTemplate
 metadata:
@@ -111,6 +115,35 @@ spec:
         repo: test
         pr: "3"
         label: test
+EOF
+cat <<EOF | kubectl create -f -
+apiVersion: argoproj.io/v1alpha1
+kind: Workflow
+metadata:
+  generateName: plugin
+  namespace: default
+spec:
+  workflowTemplateRef:
+    name: plugin
+EOF
+```
+
+It could create (and update) a comment on target pull request to show the status of the Workflow. See also:
+
+```yaml
+hello-world is Succeeded. It takes 3m30.19239846s. Please check log output from [here](https://10.121.218.184:30298/workflows/default/hello-world-r2lqm).
+
+| Stage | Status | Duration |
+|---|---|---|
+| test | Succeeded | 38s |
+| scan | Succeeded | 54s |
+| build | Succeeded | 2m54s |
+| clone | Succeeded | 26s |
+| check | Succeeded | 33s |
+| build(0) | Succeeded | 2m44s |
+
+
+Comment from [gogit](https://github.com/linuxsuren/gogit).
 ```
 
 ## TODO

@@ -1,10 +1,12 @@
 build:
 	CGO_ENABLE=0 go build -ldflags "-w -s" -o bin/gogit
+plugin-build:
+	CGO_ENABLE=0 go build -ldflags "-w -s" -o bin/gogit-executor-plugin cmd/argoworkflow/main.go
 copy: build
 	cp bin/gogit /usr/local/bin
 test:
 	go test ./... -coverprofile coverage.out
-pre-commit: test
+pre-commit: test build plugin-build
 goreleaser:
 	goreleaser build --snapshot --rm-dist
 image:
