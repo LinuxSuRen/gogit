@@ -34,7 +34,8 @@ func TestCommentTemlate(t *testing.T) {
 	object := map[string]interface{}{}
 	object["Status"] = status
 	object["Annotations"] = map[string]string{
-		"workflow.link": "https://github.com/linxusuren/gogit",
+		"workflow.link":         "https://github.com/linxusuren/gogit",
+		"workflow.templatelink": "https://github.com/linxusuren/gogit.git",
 	}
 	object["Spec"] = map[string]interface{}{
 		"WorkflowTemplateRef": map[string]string{
@@ -45,7 +46,7 @@ func TestCommentTemlate(t *testing.T) {
 	result, err := template.RenderTemplate(template.CommentTemplate, object)
 	assert.Nil(t, err)
 	assert.Equal(t, `
-Sample is Failed. It takes 5s. Please check log output from [here](https://github.com/linxusuren/gogit).
+[Sample](https://github.com/linxusuren/gogit.git) is Failed. It takes 5s. Please check log output from [here](https://github.com/linxusuren/gogit).
 
 | Stage | Status | Duration |
 |---|---|---|
