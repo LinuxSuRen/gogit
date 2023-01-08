@@ -43,6 +43,7 @@ func main() {
 		"The port of the HTTP server")
 	flags.BoolVarP(&opt.CreateComment, "create-comment", "", false, "Indicate if want to create a status comment")
 	flags.StringVarP(&opt.CommentTemplate, "comment-template", "", "", "The template of the comment")
+	flags.StringVarP(&opt.CommentIdentity, "comment-identity", "", pkg.CommentEndMarker, "The identity for matching exiting comment")
 	if err := cmd.Execute(); err != nil {
 		os.Exit(1)
 	}
@@ -69,6 +70,7 @@ type option struct {
 
 	CreateComment   bool
 	CommentTemplate string
+	CommentIdentity string
 
 	Owner       string
 	Repo        string
@@ -183,7 +185,7 @@ func (e *DefaultPluginExecutor) Execute(args executor.ExecuteTemplateArgs, wf *w
 		var message string
 		message, err = template.RenderTemplate(tplText, wf)
 		if err == nil {
-			err = pkg.CreateComment(ctx, repo, message)
+			err = pkg.CreateComment(ctx, repo, message, opt.Option.CommentIdentity)
 		} else {
 			err = fmt.Errorf("failed to render comment template: %v", err)
 		}
