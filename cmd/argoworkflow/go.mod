@@ -4,7 +4,7 @@ go 1.18
 
 require (
 	github.com/argoproj/argo-workflows/v3 v3.4.4
-	github.com/linuxsuren/gogit v0.0.5-0.20230108073958-1962f90e6d0f
+	github.com/linuxsuren/gogit v0.0.5-0.20230108094346-b4c1d3962862
 	github.com/spf13/cobra v1.6.1
 	github.com/stretchr/testify v1.8.1
 	k8s.io/apimachinery v0.26.0
