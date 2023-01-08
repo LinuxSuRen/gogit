@@ -137,6 +137,8 @@ github.com/linuxsuren/gogit v0.0.5-0.20230106063430-7d96e708cf7d h1:TDKAC8+UNSQt
 github.com/linuxsuren/gogit v0.0.5-0.20230106063430-7d96e708cf7d/go.mod h1:Qo/oN8JkdigUQqxwU7yPzQdbvmp8dyKmhQHle1YzWoc=
 github.com/linuxsuren/gogit v0.0.5-0.20230108073958-1962f90e6d0f h1:eQ7uEyknD+aMRN8iyQDReQasvWdAuK/Z09Od2VqCA4E=
 github.com/linuxsuren/gogit v0.0.5-0.20230108073958-1962f90e6d0f/go.mod h1:ncCff+SHeZUYEFCdGito+wuECgl/rXyyt8iV10aKKHU=
+github.com/linuxsuren/gogit v0.0.5-0.20230108094346-b4c1d3962862 h1:04Jk6OkM+HhA19Tg51Cg+bnlNvi4HzLh0ZaUaLIxbOQ=
+github.com/linuxsuren/gogit v0.0.5-0.20230108094346-b4c1d3962862/go.mod h1:ncCff+SHeZUYEFCdGito+wuECgl/rXyyt8iV10aKKHU=
 github.com/mailru/easyjson v0.0.0-20190614124828-94de47d64c63/go.mod h1:C1wdFJiN94OJF2b5HbByQZoLdCWB1Yqtg26g4irojpc=
 github.com/mailru/easyjson v0.0.0-20190626092158-b2ccc519800e/go.mod h1:C1wdFJiN94OJF2b5HbByQZoLdCWB1Yqtg26g4irojpc=
 github.com/mailru/easyjson v0.7.6/go.mod h1:xzfreul335JAWq5oZzymOObrkdz5UnU4kGfJJLY9Nlc=
