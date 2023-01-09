@@ -4,6 +4,7 @@ builds:
     goos:
       - linux
       - windows
+      - darwin
 archives:
   - name_template: "{{ .Binary }}-{{ .Os }}-{{ .Arch }}"
     format_overrides:
