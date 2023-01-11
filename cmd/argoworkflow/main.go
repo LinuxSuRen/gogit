@@ -96,6 +96,7 @@ func (e *DefaultPluginExecutor) Execute(args executor.ExecuteTemplateArgs, wf *w
 	if wf.Spec.WorkflowTemplateRef != nil {
 		name = wf.Spec.WorkflowTemplateRef.Name
 	}
+	wf.Status.Phase = wfv1.WorkflowPhase(wf.Status.Nodes[wf.Name].Phase)
 	status := wf.Status
 
 	p := args.Template.Plugin.Value
@@ -132,14 +133,6 @@ func (e *DefaultPluginExecutor) Execute(args executor.ExecuteTemplateArgs, wf *w
 		default:
 			repo.Status = strings.ToLower(string(status.Phase))
 		}
-
-		// try to figure out if this is the final step
-		for _, node := range status.Nodes {
-			if node.Type == wfv1.NodeTypePlugin && strings.HasSuffix(node.Name, ".onExit") {
-				repo.Status = "success"
-				break
-			}
-		}
 	}
 	if repo.PrNumber, err = strconv.Atoi(opt.Option.PR); err != nil {
 		err = fmt.Errorf("wrong pull-request number, %v", err)
@@ -169,7 +162,6 @@ func (e *DefaultPluginExecutor) Execute(args executor.ExecuteTemplateArgs, wf *w
 				toRemoves = append(toRemoves, key)
 			}
 		}
-		wf.Status.Phase = wfv1.WorkflowPhase(wf.Status.Nodes[wf.Name].Phase)
 		// remove useless nodes
 		delete(wf.Status.Nodes, wf.Name)
 		for _, key := range toRemoves {
