@@ -191,7 +191,7 @@ func (e *DefaultPluginExecutor) Execute(args executor.ExecuteTemplateArgs, wf *w
 		var message string
 		message, err = template.RenderTemplate(tplText, wf)
 		if err == nil {
-			outputs := GetOutputs(wf)
+			outputs := GetOutputsWithTarget(wf, opt.Option.Target)
 			var outputsComment string
 			if len(outputs) > 0 {
 				outputsComment, err = template.RenderTemplate(template.OutputsTemplate, outputs)

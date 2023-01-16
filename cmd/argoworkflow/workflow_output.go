@@ -25,8 +25,9 @@ func GetOutputs(wf *wfv1.Workflow) (outputs map[string]template.OutputObject) {
 			if artifact.Path != "" {
 				// TODO assume this is a artifact file
 				outputObject = &template.OutputObject{
-					Kind: template.FileOutput,
-					File: fmt.Sprintf("/artifact-files/%s/workflows/%s/%s/outputs/%s", wf.Namespace, wf.Name, node.Name, artifact.Name),
+					Kind:     template.FileOutput,
+					FileName: artifact.Path,
+					File:     fmt.Sprintf("/artifact-files/%s/workflows/%s/%s/outputs/%s", wf.Namespace, wf.Name, node.Name, artifact.Name),
 				}
 				outputs[key] = *outputObject
 			}
@@ -45,4 +46,19 @@ func GetOutputs(wf *wfv1.Workflow) (outputs map[string]template.OutputObject) {
 		}
 	}
 	return
+}
+
+// GetOutputsWithTarget returns the outputs which has the target server address
+func GetOutputsWithTarget(wf *wfv1.Workflow, target string) map[string]template.OutputObject {
+	outputs := GetOutputs(wf)
+	// add the server address
+	if len(outputs) > 0 {
+		for i, output := range outputs {
+			if output.File != "" {
+				output.File = target + output.File
+				outputs[i] = output
+			}
+		}
+	}
+	return outputs
 }
