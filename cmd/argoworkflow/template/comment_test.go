@@ -10,7 +10,12 @@ import (
 )
 
 func TestCommentTemlate(t *testing.T) {
-	startTime := v1.Now()
+	var layout string = "2006-01-02 15:04:05"
+	var timeStr string = "2019-12-12 15:22:12"
+	targetTime, err := time.ParseInLocation(layout, timeStr, time.Local)
+	assert.Nil(t, err)
+
+	startTime := v1.Time{Time: targetTime}
 	endTime := v1.Time{Time: startTime.Add(time.Second * 5)}
 
 	node1 := map[string]interface{}{"Phase": "Success", "DisplayName": "node-1", "StartedAt": startTime, "FinishedAt": endTime, "StartedTime": "2023-01-06T07:49:07Z", "EndedTime": "2023-01-06T07:54:26Z"}
@@ -46,7 +51,7 @@ func TestCommentTemlate(t *testing.T) {
 	result, err := template.RenderTemplate(template.CommentTemplate, object)
 	assert.Nil(t, err)
 	assert.Equal(t, `
-[Sample](https://github.com/linxusuren/gogit.git) is Failed. It takes 5s. Please check log output from [here](https://github.com/linxusuren/gogit).
+[Sample](https://github.com/linxusuren/gogit.git) is Failed. It started from 12-12 15:22, and took 5s. Please check log output from [here](https://github.com/linxusuren/gogit).
 
 | Stage | Status | Duration |
 |---|---|---|
@@ -68,4 +73,26 @@ func TestCommentTemlate(t *testing.T) {
 | node-1 | Success | 5m19s |
 | node-2 | Failed | 5m19s |
 `, result)
+}
+
+func TestOutput(t *testing.T) {
+	objects := map[string]template.OutputObject{}
+	objects["test"] = template.OutputObject{
+		Kind: template.FileOutput,
+		File: "https://github.com",
+	}
+	objects["string"] = template.OutputObject{
+		Kind:  template.ValueOutput,
+		Value: "ghcr.io/linuxsuren/gogit",
+	}
+
+	result, err := template.RenderTemplate(template.OutputsTemplate, objects)
+	assert.Nil(t, err)
+	assert.Equalf(t, `
+Please feel free to check the following outputs:
+| Output |
+|---|
+| string - ghcr.io/linuxsuren/gogit |
+| [test](https://github.com) |
+`, result, result)
 }

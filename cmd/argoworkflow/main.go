@@ -158,6 +158,7 @@ func (e *DefaultPluginExecutor) Execute(args executor.ExecuteTemplateArgs, wf *w
 		// find useless nodes
 		var toRemoves []string
 		for key, val := range wf.Status.Nodes {
+			// TODO add a filter to allow users to do this, and keep this as default
 			if strings.HasSuffix(val.Name, ".onExit") || strings.Contains(val.Name, ".hooks.") {
 				toRemoves = append(toRemoves, key)
 			}
@@ -190,7 +191,19 @@ func (e *DefaultPluginExecutor) Execute(args executor.ExecuteTemplateArgs, wf *w
 		var message string
 		message, err = template.RenderTemplate(tplText, wf)
 		if err == nil {
-			err = pkg.CreateComment(ctx, repo, message, opt.Option.CommentIdentity)
+			outputs := GetOutputs(wf)
+			var outputsComment string
+			if len(outputs) > 0 {
+				outputsComment, err = template.RenderTemplate(template.OutputsTemplate, outputs)
+			}
+
+			if err == nil {
+				if outputsComment != "" {
+					message = message + "\n" + outputsComment
+				}
+
+				err = pkg.CreateComment(ctx, repo, message, opt.Option.CommentIdentity)
+			}
 		} else {
 			err = fmt.Errorf("failed to render comment template: %v", err)
 		}
