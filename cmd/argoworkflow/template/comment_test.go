@@ -78,8 +78,9 @@ func TestCommentTemlate(t *testing.T) {
 func TestOutput(t *testing.T) {
 	objects := map[string]template.OutputObject{}
 	objects["test"] = template.OutputObject{
-		Kind: template.FileOutput,
-		File: "https://github.com",
+		Kind:     template.FileOutput,
+		File:     "https://github.com",
+		FileName: "install.yaml",
 	}
 	objects["string"] = template.OutputObject{
 		Kind:  template.ValueOutput,
@@ -90,9 +91,10 @@ func TestOutput(t *testing.T) {
 	assert.Nil(t, err)
 	assert.Equalf(t, `
 Please feel free to check the following outputs:
+
 | Output |
 |---|
-| string - ghcr.io/linuxsuren/gogit |
-| [test](https://github.com) |
+| string: ghcr.io/linuxsuren/gogit |
+| [install.yaml](https://github.com) |
 `, result, result)
 }

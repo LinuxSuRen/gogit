@@ -13,13 +13,14 @@ const CommentTemplate = `
 
 const OutputsTemplate = `
 Please feel free to check the following outputs:
+
 | Output |
 |---|
 {{- range $name, $output := .}}
 {{- if eq "file" (toString $output.Kind)}}
-| [{{$name}}]({{$output.File}}) |
+| [{{$output.FileName}}]({{$output.File}}) |
 {{- else if eq "string" (toString $output.Kind)}}
-| {{$name}} - {{$output.Value}} |
+| {{$name}}: {{$output.Value}} |
 {{- end}}
 {{- end}}
 `

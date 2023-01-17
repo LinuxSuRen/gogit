@@ -1,7 +1,7 @@
 build:
 	CGO_ENABLE=0 go build -ldflags "-w -s" -o bin/gogit
 plugin-build:
-	CGO_ENABLE=0 go build -ldflags "-w -s" -o bin/gogit-executor-plugin cmd/argoworkflow/main.go
+	cd cmd/argoworkflow && CGO_ENABLE=0 go build -ldflags "-w -s" -o bin/gogit-executor-plugin
 copy: build
 	cp bin/gogit /usr/local/bin
 test:
