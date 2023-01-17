@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -188,6 +189,8 @@ func (e *DefaultPluginExecutor) Execute(args executor.ExecuteTemplateArgs, wf *w
 		wf.Annotations["workflow.link"] = targetAddress
 		wf.Annotations["workflow.templatelink"] = targetTemplateAddress
 
+		deleteRetryNodes(wf)
+
 		var message string
 		message, err = template.RenderTemplate(tplText, wf)
 		if err == nil {
@@ -226,6 +229,22 @@ func (e *DefaultPluginExecutor) Execute(args executor.ExecuteTemplateArgs, wf *w
 		},
 	}
 	return
+}
+
+func deleteRetryNodes(wf *wfv1.Workflow) {
+	var toDeletes []string
+	reg, err := regexp.Compile(`\(\d*\)`)
+	if err == nil {
+		for key, node := range wf.Status.Nodes {
+			if matched := reg.MatchString(node.DisplayName); matched {
+				toDeletes = append(toDeletes, key)
+			}
+		}
+
+		for _, key := range toDeletes {
+			delete(wf.Status.Nodes, key)
+		}
+	}
 }
 
 type PluginExecutor interface {
