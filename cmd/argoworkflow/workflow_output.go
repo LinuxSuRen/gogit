@@ -27,7 +27,7 @@ func GetOutputs(wf *wfv1.Workflow) (outputs map[string]template.OutputObject) {
 				outputObject = &template.OutputObject{
 					Kind:     template.FileOutput,
 					FileName: artifact.Path,
-					File:     fmt.Sprintf("/artifact-files/%s/workflows/%s/%s/outputs/%s", wf.Namespace, wf.Name, node.Name, artifact.Name),
+					File:     fmt.Sprintf("/artifact-files/%s/workflows/%s/%s/outputs/%s", wf.Namespace, wf.Name, node.ID, artifact.Name),
 				}
 				outputs[key] = *outputObject
 			}
