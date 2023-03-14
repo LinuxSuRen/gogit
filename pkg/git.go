@@ -136,11 +136,10 @@ func (s *StatusMaker) CreateComment(ctx context.Context, message, endMarker stri
 		}
 	}
 
-	commentID := -1
+	var commentIDs []int //:= -1
 	for _, comment := range comments {
 		if strings.HasSuffix(comment.Body, endMarker) {
-			commentID = comment.ID
-			break
+			commentIDs = append(commentIDs, comment.ID)
 		}
 	}
 
@@ -148,11 +147,16 @@ func (s *StatusMaker) CreateComment(ctx context.Context, message, endMarker stri
 		Body: fmt.Sprintf("%s\n\n%s", message, endMarker),
 	}
 
-	if commentID == -1 {
+	if len(commentIDs) == 0 {
 		// not found existing comment, create a new one
 		_, _, err = scmClient.PullRequests.CreateComment(ctx, s.repo, s.pr, commentInput)
 	} else {
-		_, _, err = scmClient.PullRequests.EditComment(ctx, s.repo, s.pr, commentID, commentInput)
+		_, _, err = scmClient.PullRequests.EditComment(ctx, s.repo, s.pr, commentIDs[0], commentInput)
+
+		// remove the duplicated comments
+		for i := 1; i < len(commentIDs); i++ {
+			_, _ = scmClient.PullRequests.DeleteComment(ctx, s.repo, s.pr, commentIDs[i])
+		}
 	}
 	return
 }

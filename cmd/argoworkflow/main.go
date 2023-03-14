@@ -20,7 +20,10 @@ import (
 	"github.com/linuxsuren/gogit/pkg"
 	"github.com/spf13/cobra"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/wait"
+
 	"k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/clientcmd"
 )
 
 func main() {
@@ -42,6 +45,7 @@ func main() {
 		"The root URL of Argo Workflows UI")
 	flags.IntVarP(&opt.Port, "port", "", 3001,
 		"The port of the HTTP server")
+	flags.StringVarP(&opt.KubeConfig, "kubeconfig", "", "", "The kubeconfig file path")
 	flags.BoolVarP(&opt.CreateComment, "create-comment", "", false, "Indicate if want to create a status comment")
 	flags.StringVarP(&opt.CommentTemplate, "comment-template", "", "", "The template of the comment")
 	flags.StringVarP(&opt.CommentIdentity, "comment-identity", "", pkg.CommentEndMarker, "The identity for matching exiting comment")
@@ -52,7 +56,7 @@ func main() {
 
 func (o *option) runE(cmd *cobra.Command, args []string) (err error) {
 	var config *rest.Config
-	if config, err = rest.InClusterConfig(); err != nil {
+	if config, err = clientcmd.BuildConfigFromFlags("", o.KubeConfig); err != nil {
 		return
 	}
 	client := wfclientset.NewForConfigOrDie(config)
@@ -63,11 +67,12 @@ func (o *option) runE(cmd *cobra.Command, args []string) (err error) {
 }
 
 type option struct {
-	Provider string
-	Server   string
-	Username string
-	Token    string
-	Port     int
+	Provider   string
+	Server     string
+	Username   string
+	Token      string
+	Port       int
+	KubeConfig string
 
 	CreateComment   bool
 	CommentTemplate string
@@ -141,16 +146,16 @@ func (e *DefaultPluginExecutor) Execute(args executor.ExecuteTemplateArgs, wf *w
 	}
 
 	fmt.Println("send status", repo)
-	var nodeResult *wfv1.NodeResult
-	if err = pkg.CreateStatus(ctx, repo); err == nil {
-		nodeResult = &wfv1.NodeResult{
-			Phase:   wfv1.NodeSucceeded,
-			Message: "success",
-		}
-		fmt.Println("send status success")
-	} else {
-		fmt.Println("failed to send status", err)
+	wait.PollImmediate(time.Second*2, time.Second*30, func() (bool, error) {
+		err := pkg.CreateStatus(ctx, repo)
+		return err == nil, nil
+	})
+
+	nodeResult := &wfv1.NodeResult{
+		Phase:   wfv1.NodeSucceeded,
+		Message: "success",
 	}
+	fmt.Println("send status success")
 
 	if err == nil && opt.Option.CreateComment {
 		fmt.Println("start to create comment")
