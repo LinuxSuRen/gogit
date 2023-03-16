@@ -19,6 +19,7 @@ import (
 	"github.com/linuxsuren/gogit/argoworkflow/template"
 	"github.com/linuxsuren/gogit/pkg"
 	"github.com/spf13/cobra"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 
@@ -146,7 +147,7 @@ func (e *DefaultPluginExecutor) Execute(args executor.ExecuteTemplateArgs, wf *w
 	}
 
 	fmt.Println("send status", repo)
-	wait.PollImmediate(time.Second*2, time.Second*30, func() (bool, error) {
+	wait.PollImmediate(time.Second, time.Second*10, func() (bool, error) {
 		err := pkg.CreateStatus(ctx, repo)
 		return err == nil, nil
 	})
@@ -167,6 +168,11 @@ func (e *DefaultPluginExecutor) Execute(args executor.ExecuteTemplateArgs, wf *w
 			// TODO add a filter to allow users to do this, and keep this as default
 			if strings.HasSuffix(val.Name, ".onExit") || strings.Contains(val.Name, ".hooks.") {
 				toRemoves = append(toRemoves, key)
+			}
+
+			if val.FinishedAt.IsZero() {
+				val.FinishedAt = metav1.Now()
+				wf.Status.Nodes[key] = val
 			}
 		}
 		// remove useless nodes
@@ -193,6 +199,10 @@ func (e *DefaultPluginExecutor) Execute(args executor.ExecuteTemplateArgs, wf *w
 			wf.Spec.WorkflowTemplateRef.Name)
 		wf.Annotations["workflow.link"] = targetAddress
 		wf.Annotations["workflow.templatelink"] = targetTemplateAddress
+		if wf.Status.FinishedAt.IsZero() {
+			// make sure the duration is positive
+			wf.Status.FinishedAt = metav1.Now()
+		}
 
 		deleteRetryNodes(wf)
 
@@ -284,7 +294,6 @@ func plugin(p PluginExecutor, client *wfclientset.Clientset) func(w http.Respons
 		}
 
 		go func(c *wfclientset.Clientset, args executor.ExecuteTemplateArgs) {
-			time.Sleep(3 * time.Second)
 			wfName := args.Workflow.ObjectMeta.Name
 			wfNamespace := args.Workflow.ObjectMeta.Namespace
 
