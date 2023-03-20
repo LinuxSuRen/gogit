@@ -27,6 +27,7 @@ func newStatusCmd() (cmd *cobra.Command) {
 		"Identity of a build token")
 	flags.StringVarP(&opt.description, "description", "", "",
 		"The description of a build token")
+	flags.BoolVarP(&opt.print, "print", "", false, "Print the status list then exit")
 
 	_ = cmd.MarkFlagRequired("repo")
 	_ = cmd.MarkFlagRequired("pr")
@@ -63,6 +64,26 @@ func (o *statusOption) preRunE(cmd *cobra.Command, args []string) (err error) {
 }
 
 func (o *statusOption) runE(cmd *cobra.Command, args []string) (err error) {
+	if o.print {
+		maker := pkg.NewMaker(cmd.Context(), pkg.RepoInformation{
+			Provider:    o.provider,
+			Server:      o.server,
+			Owner:       o.owner,
+			Repo:        o.repo,
+			PrNumber:    o.pr,
+			Target:      o.target,
+			Username:    o.username,
+			Token:       o.token,
+			Status:      o.status,
+			Label:       o.label,
+			Description: o.description,
+		})
+		if maker != nil {
+			err = maker.ListStatus(cmd.Context(), o.label, o.description)
+		}
+		return
+	}
+
 	err = pkg.CreateStatus(cmd.Context(), pkg.RepoInformation{
 		Provider:    o.provider,
 		Server:      o.server,
@@ -112,4 +133,5 @@ type statusOption struct {
 	target      string
 	label       string
 	description string
+	print       bool
 }
