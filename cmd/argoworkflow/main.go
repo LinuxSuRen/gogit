@@ -98,6 +98,24 @@ type pluginOption struct {
 
 func (e *DefaultPluginExecutor) Execute(args executor.ExecuteTemplateArgs, wf *wfv1.Workflow) (
 	resp executor.ExecuteTemplateResponse, err error) {
+	defer func() {
+		resp = executor.ExecuteTemplateResponse{
+			Body: executor.ExecuteTemplateReply{},
+		}
+
+		if err == nil {
+			resp.Body.Node = &wfv1.NodeResult{
+				Phase:   wfv1.NodeSucceeded,
+				Message: "success",
+			}
+		} else {
+			resp.Body.Node = &wfv1.NodeResult{
+				Phase:   wfv1.NodeFailed,
+				Message: err.Error(),
+			}
+		}
+	}()
+
 	ctx := context.Background()
 	var name string
 	if wf.Spec.WorkflowTemplateRef != nil {
@@ -140,6 +158,16 @@ func (e *DefaultPluginExecutor) Execute(args executor.ExecuteTemplateArgs, wf *w
 		default:
 			repo.Status = strings.ToLower(string(status.Phase))
 		}
+	} else {
+		switch repo.Status {
+		case string(wfv1.WorkflowSucceeded):
+			// from Argo Workflow
+			repo.Status = "success"
+		case string(wfv1.WorkflowFailed):
+			repo.Status = "failure"
+		default:
+			repo.Status = strings.ToLower(string(status.Phase))
+		}
 	}
 	if repo.PrNumber, err = strconv.Atoi(opt.Option.PR); err != nil {
 		err = fmt.Errorf("wrong pull-request number, %v", err)
@@ -152,10 +180,6 @@ func (e *DefaultPluginExecutor) Execute(args executor.ExecuteTemplateArgs, wf *w
 		return err == nil, nil
 	})
 
-	nodeResult := &wfv1.NodeResult{
-		Phase:   wfv1.NodeSucceeded,
-		Message: "success",
-	}
 	fmt.Println("send status success")
 
 	if err == nil && opt.Option.CreateComment {
@@ -230,19 +254,6 @@ func (e *DefaultPluginExecutor) Execute(args executor.ExecuteTemplateArgs, wf *w
 			fmt.Println("failed to create comment", err)
 		}
 	}
-
-	if err != nil {
-		nodeResult = &wfv1.NodeResult{
-			Phase:   wfv1.NodeFailed,
-			Message: err.Error(),
-		}
-	}
-
-	resp = executor.ExecuteTemplateResponse{
-		Body: executor.ExecuteTemplateReply{
-			Node: nodeResult,
-		},
-	}
 	return
 }
 
@@ -293,29 +304,23 @@ func plugin(p PluginExecutor, client *wfclientset.Clientset) func(w http.Respons
 			return
 		}
 
-		go func(c *wfclientset.Clientset, args executor.ExecuteTemplateArgs) {
-			wfName := args.Workflow.ObjectMeta.Name
-			wfNamespace := args.Workflow.ObjectMeta.Namespace
+		wfName := args.Workflow.ObjectMeta.Name
+		wfNamespace := args.Workflow.ObjectMeta.Namespace
 
-			// find the Workflow
-			var workflow *wfv1.Workflow
-			if workflow, err = client.ArgoprojV1alpha1().Workflows(wfNamespace).Get(
-				context.Background(),
-				wfName,
-				v1.GetOptions{}); err != nil {
-				fmt.Println("failed to find workflow", wfName, wfNamespace, err)
-				return
-			}
+		// find the Workflow
+		var workflow *wfv1.Workflow
+		if workflow, err = client.ArgoprojV1alpha1().Workflows(wfNamespace).Get(
+			context.Background(),
+			wfName,
+			v1.GetOptions{}); err != nil {
+			fmt.Println("failed to find workflow", wfName, wfNamespace, err)
+			return
+		}
 
-			_, _ = p.Execute(args, workflow)
-		}(client, args)
+		var executeTemplateResponse executor.ExecuteTemplateResponse
+		executeTemplateResponse, _ = p.Execute(args, workflow)
 
-		jsonResp, err := json.Marshal(executor.ExecuteTemplateReply{
-			Node: &wfv1.NodeResult{
-				Phase:   wfv1.NodeSucceeded,
-				Message: "success",
-			},
-		})
+		jsonResp, err := json.Marshal(executeTemplateResponse.Body)
 		if err != nil {
 			fmt.Println("something went wrong", err)
 			http.Error(w, "something went wrong", http.StatusBadRequest)

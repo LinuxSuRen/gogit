@@ -201,6 +201,37 @@ func (s *StatusMaker) CreateStatus(ctx context.Context, status scm.State, label,
 	return
 }
 
+// ListStatus list the status
+func (s *StatusMaker) ListStatus(ctx context.Context, label, desc string) (err error) {
+	var scmClient *scm.Client
+	if scmClient, err = factory.NewClient(s.provider, s.server, s.token, func(c *scm.Client) {
+		c.Username = s.username
+	}); err != nil {
+		return
+	}
+
+	var pullRequest *scm.PullRequest
+	if pullRequest, _, err = scmClient.PullRequests.Find(ctx, s.repo, s.pr); err == nil {
+		var exists []*scm.Status
+		if exists, _, err = scmClient.Repositories.ListStatus(ctx, s.repo, pullRequest.Sha, &scm.ListOptions{
+			Page: 1,
+			Size: 100, // assume this list has not too many items
+		}); err != nil {
+			err = fmt.Errorf("failed to list the existing status, error: %v", err)
+			return
+		}
+
+		for _, item := range exists {
+			if item.Label == label {
+				fmt.Println(item.State)
+			}
+		}
+	} else {
+		err = fmt.Errorf("failed to find pull requests [%d] from [%s] %v", s.pr, s.repo, err)
+	}
+	return
+}
+
 // FindPreviousStatus finds the existing status by sha and label
 func (s *StatusMaker) FindPreviousStatus(ctx context.Context, scmClient *scm.Client, sha, label string) (target *scm.Status, err error) {
 	var exists []*scm.Status
