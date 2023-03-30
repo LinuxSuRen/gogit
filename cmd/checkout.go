@@ -36,6 +36,7 @@ func newCheckoutCommand() (c *cobra.Command) {
 	flags.IntVarP(&opt.pr, "pr", "p", -1, "The pr number want to checkout, -1 means do nothing")
 	flags.StringVarP(&opt.target, "target", "", ".", "Clone git repository to the target path")
 	flags.StringVarP(&opt.versionOutput, "version-output", "", "", "Write the version to target file")
+	flags.StringVarP(&opt.trimVersionPrefix, "version-trim-prefix", "", "", "Trim the prefix of the version")
 	return
 }
 
@@ -132,7 +133,7 @@ func (o *checkoutOption) runE(c *cobra.Command, args []string) (err error) {
 		var head *plumbing.Reference
 		if head, err = repo.Head(); err == nil {
 			if o.versionOutput != "" {
-				err = os.WriteFile(o.versionOutput, []byte(head.Name().Short()), 0444)
+				err = os.WriteFile(o.versionOutput, []byte(strings.TrimPrefix(head.Name().Short(), o.trimVersionPrefix)), 0444)
 			}
 		}
 	}
@@ -167,12 +168,13 @@ func prRef(pr int, kind string) (ref string) {
 }
 
 type checkoutOption struct {
-	url           string
-	remote        string
-	branch        string
-	tag           string
-	pr            int
-	target        string
-	versionOutput string
-	sshPrivateKey string
+	url               string
+	remote            string
+	branch            string
+	tag               string
+	pr                int
+	target            string
+	sshPrivateKey     string
+	versionOutput     string
+	trimVersionPrefix string
 }
