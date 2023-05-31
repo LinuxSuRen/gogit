@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/go-git/go-git/v5/plumbing/transport/http"
+
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/config"
 	"github.com/go-git/go-git/v5/plumbing"
@@ -31,6 +33,8 @@ func newCheckoutCommand() (c *cobra.Command) {
 	flags.StringVarP(&opt.remote, "remote", "", "origin", "The remote name")
 	flags.StringVarP(&opt.sshPrivateKey, "ssh-private-key", "", "$HOME/.ssh/id_rsa",
 		"The SSH private key file path")
+	flags.StringVarP(&opt.username, "username", "", "", "The username of the git repository")
+	flags.StringVarP(&opt.password, "password", "", "", "The password of the git repository")
 	flags.StringVarP(&opt.branch, "branch", "b", "master", "The branch want to checkout. It could be a short name or fullname. Such as master or refs/heads/master")
 	flags.StringVarP(&opt.tag, "tag", "", "", "The tag want to checkout")
 	flags.IntVarP(&opt.pr, "pr", "p", -1, "The pr number want to checkout, -1 means do nothing")
@@ -144,6 +148,11 @@ func (o *checkoutOption) getAuth(remote string) (auth transport.AuthMethod, err 
 	if strings.HasPrefix(remote, "git@") {
 		rsa := os.ExpandEnv(o.sshPrivateKey)
 		auth, err = ssh.NewPublicKeysFromFile("git", rsa, "")
+	} else if o.username != "" && o.password != "" {
+		auth = &http.BasicAuth{
+			Username: o.username,
+			Password: o.password,
+		}
 	}
 	return
 }
@@ -177,4 +186,6 @@ type checkoutOption struct {
 	sshPrivateKey     string
 	versionOutput     string
 	trimVersionPrefix string
+	username          string
+	password          string
 }
