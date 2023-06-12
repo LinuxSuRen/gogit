@@ -1,7 +1,7 @@
 build:
-	CGO_ENABLE=0 go build -ldflags "-w -s" -o bin/gogit
+	CGO_ENABLED=0 go build -ldflags "-w -s" -o bin/gogit
 plugin-build:
-	cd cmd/argoworkflow && CGO_ENABLE=0 go build -ldflags "-w -s" -o bin/gogit-executor-plugin
+	cd cmd/argoworkflow && CGO_ENABLED=0 go build -ldflags "-w -s" -o bin/gogit-executor-plugin
 copy: build
 	cp bin/gogit /usr/local/bin
 test:
@@ -12,7 +12,7 @@ goreleaser:
 image:
 	docker build . -t ghcr.io/linuxsuren/gogit
 build-workflow-executor-gogit:
-	cd cmd/argoworkflow && CGO_ENABLE=0 go build -ldflags "-w -s" -o ../../bin/workflow-executor-gogit
+	cd cmd/argoworkflow && CGO_ENABLED=0 go build -ldflags "-w -s" -o ../../bin/workflow-executor-gogit
 image-workflow-executor-gogit:
 	cd cmd/argoworkflow && docker build . -t ghcr.io/linuxsuren/workflow-executor-gogit:dev --build-arg GOPROXY=https://goproxy.io,direct
 push-image-workflow-executor-gogit: image-workflow-executor-gogit
