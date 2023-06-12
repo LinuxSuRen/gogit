@@ -126,8 +126,7 @@ func (o *checkoutOption) runE(c *cobra.Command, args []string) (err error) {
 			}
 
 			if err = wd.Checkout(&git.CheckoutOptions{
-				Create: true,
-				Branch: plumbing.NewBranchReferenceName(fmt.Sprintf("pr-%d", o.pr)),
+				Branch: plumbing.ReferenceName(fmt.Sprintf("pr-%d", o.pr)),
 			}); err != nil && !strings.Contains(err.Error(), "already exists") {
 				err = fmt.Errorf("unable to checkout git branch: %s, error: %v", o.tag, err)
 				return
