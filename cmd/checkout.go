@@ -133,7 +133,7 @@ func (o *checkoutOption) runE(c *cobra.Command, args []string) (err error) {
 				err = fmt.Errorf("unable to checkout git branch: %s, error: %v", o.tag, err)
 				return
 			}
-			version = fmt.Sprintf("%d", o.pr)
+			version = fmt.Sprintf("pr-%d", o.pr)
 		}
 
 		if o.versionOutput != "" {
