@@ -81,6 +81,7 @@ func (o *checkoutOption) runE(c *cobra.Command, args []string) (err error) {
 
 	var wd *git.Worktree
 	var remotes []*git.Remote
+	var version string
 
 	if remotes, err = repo.Remotes(); err != nil {
 		return
@@ -96,6 +97,7 @@ func (o *checkoutOption) runE(c *cobra.Command, args []string) (err error) {
 	if wd, err = repo.Worktree(); err == nil {
 		if c.Flags().Changed("branch") {
 			c.Printf("Switched to branch '%s'\n", o.branch)
+			version = o.branch
 
 			if err = wd.Checkout(&git.CheckoutOptions{
 				Branch: plumbing.NewBranchReferenceName(o.branch),
@@ -131,13 +133,11 @@ func (o *checkoutOption) runE(c *cobra.Command, args []string) (err error) {
 				err = fmt.Errorf("unable to checkout git branch: %s, error: %v", o.tag, err)
 				return
 			}
+			version = fmt.Sprintf("%d", o.pr)
 		}
 
-		var head *plumbing.Reference
-		if head, err = repo.Head(); err == nil {
-			if o.versionOutput != "" {
-				err = os.WriteFile(o.versionOutput, []byte(strings.TrimPrefix(head.Name().Short(), o.trimVersionPrefix)), 0444)
-			}
+		if o.versionOutput != "" {
+			err = os.WriteFile(o.versionOutput, []byte(strings.TrimPrefix(version, o.trimVersionPrefix)), 0444)
 		}
 	}
 	return
