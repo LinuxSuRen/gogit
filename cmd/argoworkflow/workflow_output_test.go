@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	wfv1 "github.com/argoproj/argo-workflows/v3/pkg/apis/workflow/v1alpha1"
+	"github.com/linuxsuren/gogit/argoworkflow/template"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -51,4 +52,15 @@ func TestGetOutputsWithTarget(t *testing.T) {
 			assert.Equal(t, "## Report\n", output.Value)
 		}
 	}
+	assert.Equal(t, map[string]template.OutputObject{
+		"test-test": {
+			Kind:     template.FileOutput,
+			File:     "https://github.com/artifact-files//workflows///outputs/test",
+			FileName: "test/install.yaml",
+		},
+		"report_md-report_md": {
+			Kind:  template.MarkdownOutput,
+			Value: "## Report\n",
+		},
+	}, outputs)
 }

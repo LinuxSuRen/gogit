@@ -24,7 +24,7 @@ Please feel free to check the following outputs:
 {{- end}}
 {{- end}}
 
-{{- range $name, $output := .}}
+{{ range $name, $output := .}}
 {{- if eq "markdown" (toString $output.Kind)}}
 {{$output.Value}}
 {{- end}}
