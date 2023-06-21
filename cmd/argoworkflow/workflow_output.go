@@ -58,7 +58,7 @@ func GetOutputsWithTarget(wf *wfv1.Workflow, target string) map[string]template.
 			if output.File != "" {
 				output.File = target + output.File
 			} else if strings.HasSuffix(i, "_md") {
-				output.Kind = "markdown"
+				output.Kind = template.MarkdownOutput
 			}
 			outputs[i] = output
 		}

@@ -17,4 +17,6 @@ const (
 	FileOutput OutputObjectKind = "file"
 	// ValueOutput represents a string value
 	ValueOutput OutputObjectKind = "string"
+	// MarkdownOutput represents a markdown format string value
+	MarkdownOutput OutputObjectKind = "markdown"
 )

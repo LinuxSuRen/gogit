@@ -86,6 +86,10 @@ func TestOutput(t *testing.T) {
 		Kind:  template.ValueOutput,
 		Value: "ghcr.io/linuxsuren/gogit",
 	}
+	objects["report_md"] = template.OutputObject{
+		Kind:  template.MarkdownOutput,
+		Value: "## title",
+	}
 
 	result, err := template.RenderTemplate(template.OutputsTemplate, objects)
 	assert.Nil(t, err)
@@ -96,5 +100,8 @@ Please feel free to check the following outputs:
 |---|
 | string: ghcr.io/linuxsuren/gogit |
 | [install.yaml](https://github.com) |
+
+
+## title
 `, result, result)
 }
