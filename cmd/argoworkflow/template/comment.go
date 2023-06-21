@@ -23,4 +23,10 @@ Please feel free to check the following outputs:
 | {{$name}}: {{$output.Value}} |
 {{- end}}
 {{- end}}
+
+{{- range $name, $output := .}}
+{{- if eq "markdown" (toString $output.Kind)}}
+{{$output.Value}}
+{{- end}}
+{{- end}}
 `
