@@ -30,11 +30,11 @@ func TestGetOutputsWithTarget(t *testing.T) {
 						}},
 					},
 				},
-				"report.md": wfv1.NodeStatus{
-					Name: "report.md",
+				"report_md": wfv1.NodeStatus{
+					Name: "report_md",
 					Outputs: &wfv1.Outputs{
 						Parameters: []wfv1.Parameter{{
-							Name:  "report.md",
+							Name:  "report_md",
 							Value: wfv1.AnyStringPtr("## Report\n"),
 						}},
 					},
