@@ -30,12 +30,25 @@ func TestGetOutputsWithTarget(t *testing.T) {
 						}},
 					},
 				},
+				"report.md": wfv1.NodeStatus{
+					Name: "report.md",
+					Outputs: &wfv1.Outputs{
+						Parameters: []wfv1.Parameter{{
+							Name:  "report.md",
+							Value: wfv1.AnyStringPtr("## Report\n"),
+						}},
+					},
+				},
 			},
 		},
 	}
 
 	outputs := GetOutputsWithTarget(wf, "https://github.com")
 	for _, output := range outputs {
-		assert.Truef(t, strings.HasPrefix(output.File, "https://github.com"), output.File)
+		if output.Kind == "file" {
+			assert.Truef(t, strings.HasPrefix(output.File, "https://github.com"), output.File)
+		} else if output.Kind == "markdown" {
+			assert.Equal(t, "## Report\n", output.Value)
+		}
 	}
 }

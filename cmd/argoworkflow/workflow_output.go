@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"strings"
 
 	wfv1 "github.com/argoproj/argo-workflows/v3/pkg/apis/workflow/v1alpha1"
 	"github.com/linuxsuren/gogit/argoworkflow/template"
@@ -56,8 +57,10 @@ func GetOutputsWithTarget(wf *wfv1.Workflow, target string) map[string]template.
 		for i, output := range outputs {
 			if output.File != "" {
 				output.File = target + output.File
-				outputs[i] = output
+			} else if strings.HasSuffix(i, ".md") {
+				output.Kind = "markdown"
 			}
+			outputs[i] = output
 		}
 	}
 	return outputs
