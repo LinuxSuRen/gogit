@@ -8,7 +8,7 @@ COPY go.sum go.sum
 COPY main.go main.go
 
 RUN go mod download
-RUN CGO_ENABLE=0 go build -ldflags "-w -s" -o gogit
+RUN CGO_ENABLED=0 go build -ldflags "-w -s" -o gogit
 
 FROM ubuntu:kinetic
 
