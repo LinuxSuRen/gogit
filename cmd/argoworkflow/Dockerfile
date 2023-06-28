@@ -5,7 +5,7 @@ WORKDIR /workspace
 COPY . .
 
 RUN go mod download
-RUN GOPROXY=${GOPROXY} CGO_ENABLE=0 go build -ldflags "-w -s" -o workflow-executor-gogit
+RUN GOPROXY=${GOPROXY} CGO_ENABLED=0 go build -ldflags "-w -s" -o workflow-executor-gogit
 
 FROM ubuntu:kinetic
 
