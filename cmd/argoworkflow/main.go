@@ -169,9 +169,12 @@ func (e *DefaultPluginExecutor) Execute(args executor.ExecuteTemplateArgs, wf *w
 			repo.Status = strings.ToLower(string(status.Phase))
 		}
 	}
-	if repo.PrNumber, err = strconv.Atoi(opt.Option.PR); err != nil {
-		err = fmt.Errorf("wrong pull-request number, %v", err)
+
+	if pr, parseErr := strconv.Atoi(opt.Option.PR); parseErr != nil {
+		fmt.Printf("wrong pull-request number %q, %v\n", opt.Option.PR, parseErr)
 		return
+	} else {
+		repo.PrNumber = pr
 	}
 
 	fmt.Println("send status", repo)
