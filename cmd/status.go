@@ -4,9 +4,10 @@ import (
 	"os"
 	"strings"
 
+	"github.com/jenkins-x/go-scm/scm"
+	"github.com/jenkins-x/go-scm/scm/factory"
 	"github.com/linuxsuren/gogit/pkg"
 	"github.com/spf13/cobra"
-	flag "github.com/spf13/pflag"
 )
 
 func newStatusCmd() (cmd *cobra.Command) {
@@ -18,8 +19,8 @@ func newStatusCmd() (cmd *cobra.Command) {
 		RunE:    opt.runE,
 	}
 
+	opt.addFlags(cmd)
 	flags := cmd.Flags()
-	opt.addFlags(flags)
 	flags.StringVarP(&opt.status, "status", "", "",
 		"Build token, such as: pending, success, cancelled, error")
 	flags.StringVarP(&opt.target, "target", "", "https://github.com/LinuxSuRen/gogit", "Address of the build server")
@@ -28,11 +29,6 @@ func newStatusCmd() (cmd *cobra.Command) {
 	flags.StringVarP(&opt.description, "description", "", "",
 		"The description of a build token")
 	flags.BoolVarP(&opt.print, "print", "", false, "Print the status list then exit")
-
-	_ = cmd.MarkFlagRequired("repo")
-	_ = cmd.MarkFlagRequired("pr")
-	_ = cmd.MarkFlagRequired("username")
-	_ = cmd.MarkFlagRequired("token")
 	return
 }
 
@@ -110,7 +106,8 @@ type gitProviderOption struct {
 	pr       int
 }
 
-func (o *gitProviderOption) addFlags(flags *flag.FlagSet) {
+func (o *gitProviderOption) addFlags(c *cobra.Command) {
+	flags := c.Flags()
 	flags.StringVarP(&o.provider, "provider", "p", "github", "The provider of git, such as: gitlab, github")
 	flags.StringVarP(&o.server, "server", "s", "", "The server address of target git provider, only need when it's a private provider")
 	flags.StringVarP(&o.owner, "owner", "o", "", "Owner of a git repository")
@@ -119,12 +116,24 @@ func (o *gitProviderOption) addFlags(flags *flag.FlagSet) {
 	flags.StringVarP(&o.username, "username", "u", "", "Username of the git repository")
 	flags.StringVarP(&o.token, "token", "t", "",
 		"The access token of the git repository. Or you could provide a file path, such as: file:///var/token")
+
+	_ = c.MarkFlagRequired("repo")
+	_ = c.MarkFlagRequired("pr")
+	_ = c.MarkFlagRequired("username")
+	_ = c.MarkFlagRequired("token")
 }
 
 func (o *gitProviderOption) preHandle() {
 	if o.owner == "" {
 		o.owner = o.username
 	}
+}
+
+func (o *gitProviderOption) getClient() (scmClient *scm.Client, err error) {
+	scmClient, err = factory.NewClient(o.provider, o.server, o.token, func(c *scm.Client) {
+		c.Username = o.username
+	})
+	return
 }
 
 type statusOption struct {
