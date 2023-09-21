@@ -32,8 +32,21 @@ Or in the following use cases:
 
 * [Tekton Task](https://hub.tekton.dev/tekton/task/gogit)
 
-## Argo workflow Executor
+### Send a notification to DingDing
+Below is an example of sending a notification to DingDing based on the Gitlab/GitHub pull request author/reviewers/assignees:
 
+```shell
+gogit pr --provider gitlab \
+  --server http://10.121.218.82:6080 \
+  --repo yaml-readme \
+  --pr 1 \
+  --username linuxsuren \
+  --token h-zez9CWzyzykbLoS53s \
+  --msg 'workflow done' \
+  --dingding-tokens linuxsuren=dingdingtoken
+```
+
+## Argo workflow Executor
 Install as an Argo workflow executor plugin:
 
 ```shell

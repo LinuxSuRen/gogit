@@ -16,8 +16,8 @@ func newCommentCommand() (c *cobra.Command) {
 		RunE:    opt.runE,
 	}
 
+	opt.addFlags(c)
 	flags := c.Flags()
-	opt.addFlags(flags)
 	flags.StringVarP(&opt.message, "message", "m", "", "The comment body")
 	flags.StringVarP(&opt.identity, "identity", "", pkg.CommentEndMarker, "The identity for matching exiting comment")
 	return
