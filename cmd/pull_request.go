@@ -4,11 +4,15 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"strings"
 	"sync"
 
+	"text/template"
+
 	"github.com/jenkins-x/go-scm/scm"
+	"github.com/linuxsuren/gogit/pkg"
 	"github.com/spf13/cobra"
 )
 
@@ -80,31 +84,56 @@ func (o *pullRequestOption) runE(c *cobra.Command, args []string) (err error) {
 		go func(login string) {
 			defer wait.Done()
 			if token, ok := o.dingdingTokenMap[login]; ok {
-				api := fmt.Sprintf("https://oapi.dingtalk.com/robot/send?access_token=%s", token)
-				msg := strings.NewReader(`{"msgtype": "text", "text": {"content": "` + o.msg + `"}}`)
-
-				resp, err := http.Post(api, "application/json", msg)
-				if err != nil {
-					c.Println(err)
-				} else if resp.StatusCode != http.StatusOK {
-					c.Printf("send message to %q failed, received code %d instead of 200\n", login, resp.StatusCode)
-				} else {
-					body, _ := io.ReadAll(resp.Body)
-
-					dingdingResp := &DingDingResponse{}
-					if err := json.Unmarshal(body, dingdingResp); err != nil {
-						c.Printf("cannot unmarshal the response for %q: %v\n", login, err)
-					} else if dingdingResp.ErrCode != 0 {
-						c.Printf("receive error response for %q: %q\n", login, dingdingResp.ErrMsg)
-					} else {
-						c.Printf("send message to %q successfully\n", login)
-					}
-
-				}
+				sendToDingDing(login, token, o.msg, pr, c.OutOrStderr())
 			}
 		}(login)
 	}
 	wait.Wait()
+	return
+}
+
+func sendToDingDing(login, token, msg string, pr *scm.PullRequest, c io.Writer) (err error) {
+	formattedMsg, fmtErr := formatMessage(msg, pr)
+	if fmtErr != nil {
+		log.Printf("cannot format the message %q: %v\n", msg, fmtErr)
+		formattedMsg = msg
+	}
+
+	api := fmt.Sprintf("https://oapi.dingtalk.com/robot/send?access_token=%s", token)
+	payload := strings.NewReader(`{"msgtype": "text", "text": {"content": "` + formattedMsg + `"}}`)
+	fmt.Println(`{"msgtype": "text", "text": {"content": "`+formattedMsg+`"}}`, api)
+
+	var resp *http.Response
+	resp, err = http.Post(api, "application/json", payload)
+	if err != nil {
+		fmt.Fprintln(c, err)
+	} else if resp.StatusCode != http.StatusOK {
+		fmt.Fprintf(c, "send message to %q failed, received code %d instead of 200\n", login, resp.StatusCode)
+	} else {
+		body, _ := io.ReadAll(resp.Body)
+
+		dingdingResp := &DingDingResponse{}
+		if err := json.Unmarshal(body, dingdingResp); err != nil {
+			fmt.Fprintf(c, "cannot unmarshal the response for %q: %v\n", login, err)
+		} else if dingdingResp.ErrCode != 0 {
+			fmt.Fprintf(c, "receive error response for %q: %q\n", login, dingdingResp.ErrMsg)
+		} else {
+			fmt.Fprintf(c, "send message to %q successfully\n", login)
+		}
+	}
+	return
+}
+
+func formatMessage(msg string, pr *scm.PullRequest) (result string, err error) {
+	var tpl *template.Template
+	if tpl, err = template.New("message").Parse(msg); err == nil {
+		var b strings.Builder
+		if err = tpl.Execute(&b, pr); err == nil {
+			result = b.String()
+		}
+		err = pkg.WrapError(err, "cannot format the message %q: %v", msg)
+		return
+	}
 	return
 }
 
