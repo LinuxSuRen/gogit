@@ -130,19 +130,13 @@ func (s *StatusMaker) CreateComment(ctx context.Context, message, endMarker stri
 		Page: 1,
 		Size: 100,
 	}); err != nil {
-		if err = ignoreError(err, "Not Found"); err != nil {
+		if err = IgnoreError(err, "Not Found"); err != nil {
 			err = fmt.Errorf("cannot any comments %v", err)
 			return
 		}
 	}
 
-	var commentIDs []int //:= -1
-	for _, comment := range comments {
-		if strings.HasSuffix(comment.Body, endMarker) {
-			commentIDs = append(commentIDs, comment.ID)
-		}
-	}
-
+	commentIDs := getCommentIDs(comments, endMarker)
 	commentInput := &scm.CommentInput{
 		Body: fmt.Sprintf("%s\n\n%s", message, endMarker),
 	}
@@ -150,8 +144,10 @@ func (s *StatusMaker) CreateComment(ctx context.Context, message, endMarker stri
 	if len(commentIDs) == 0 {
 		// not found existing comment, create a new one
 		_, _, err = scmClient.PullRequests.CreateComment(ctx, s.repo, s.pr, commentInput)
+		err = WrapError(err, "failed to create comment, repo is %q, pr is %d: %v", s.repo, s.pr)
 	} else {
 		_, _, err = scmClient.PullRequests.EditComment(ctx, s.repo, s.pr, commentIDs[0], commentInput)
+		err = WrapError(err, "failed to edit comment: %v")
 
 		// remove the duplicated comments
 		for i := 1; i < len(commentIDs); i++ {
@@ -161,12 +157,14 @@ func (s *StatusMaker) CreateComment(ctx context.Context, message, endMarker stri
 	return
 }
 
-func ignoreError(err error, msg string) error {
-	if err.Error() == msg {
-		return nil
-	} else {
-		return err
+func getCommentIDs(comments []*scm.Comment, endMarker string) (commentIDs []int) {
+	for _, comment := range comments {
+		// comment := comments[i]
+		if strings.HasSuffix(comment.Body, endMarker) {
+			commentIDs = append(commentIDs, comment.ID)
+		}
 	}
+	return
 }
 
 // CreateStatus creates a generic status

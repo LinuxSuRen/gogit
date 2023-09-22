@@ -45,3 +45,28 @@ func TestNewStatusMaker(t *testing.T) {
 	assert.True(t, maker.expirationCheck(&scm.Status{State: scm.StateSuccess},
 		&scm.StatusInput{State: scm.StateSuccess}))
 }
+
+func TestGetCommentIDs(t *testing.T) {
+	tests := []struct {
+		comments []*scm.Comment
+		expect   []int
+	}{{
+		comments: []*scm.Comment{{
+			Body: "start",
+			ID:   1,
+		}, {
+			Body: "start - end",
+			ID:   2,
+		}, {
+			Body: "other - end",
+			ID:   3,
+		}, {
+			Body: "other",
+			ID:   4,
+		}},
+		expect: []int{2, 3},
+	}}
+	for _, tt := range tests {
+		assert.Equal(t, tt.expect, getCommentIDs(tt.comments, "end"))
+	}
+}
