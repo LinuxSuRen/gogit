@@ -31,6 +31,7 @@ func newPullRequestCmd() (c *cobra.Command) {
 	flags.BoolVarP(&opt.printAssignee, "assignee", "", false, "Print the assignees of the pull request")
 	flags.StringVarP(&opt.msg, "msg", "", "", "The message of the pull request")
 	flags.StringSliceVarP(&opt.dingdingTokenPairs, "dingding-tokens", "", []string{}, "The dingding token pairs of the pull request, format: login=token")
+	flags.BoolVarP(&opt.skipInvalidPR, "skip-invalid-pr", "", true, "Skip the invalid pull request")
 	return
 }
 
@@ -49,6 +50,13 @@ func (o *pullRequestOption) preRunE(c *cobra.Command, args []string) (err error)
 }
 
 func (o *pullRequestOption) runE(c *cobra.Command, args []string) (err error) {
+	if o.pr <= 0 {
+		if !o.skipInvalidPR {
+			err = fmt.Errorf("invalid pr number %d", o.pr)
+		}
+		return
+	}
+
 	var scmClient *scm.Client
 	if scmClient, err = o.getClient(); err != nil {
 		return
@@ -156,4 +164,5 @@ type pullRequestOption struct {
 	msg                string
 	dingdingTokenPairs []string
 	dingdingTokenMap   map[string]string
+	skipInvalidPR      bool
 }
