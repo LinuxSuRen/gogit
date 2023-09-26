@@ -62,6 +62,25 @@ func TestPullRequestCmd(t *testing.T) {
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "Unsupported")
 	})
+
+	t.Run("invalid pr number, do not skip", func(t *testing.T) {
+		c := NewRootCommand()
+		c.SetOut(io.Discard)
+
+		c.SetArgs([]string{"pr", "--pr=-1", "--repo=xxx/xxx", "--token=token", "--username=xxx", "--skip-invalid-pr=false"})
+		err := c.Execute()
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "invalid pr number")
+	})
+
+	t.Run("skip invalid pr number", func(t *testing.T) {
+		c := NewRootCommand()
+		c.SetOut(io.Discard)
+
+		c.SetArgs([]string{"pr", "--pr=-1", "--repo=xxx/xxx", "--token=token", "--username=xxx"})
+		err := c.Execute()
+		assert.NoError(t, err)
+	})
 }
 
 func TestFormatMessage(t *testing.T) {
