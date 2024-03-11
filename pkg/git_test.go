@@ -63,8 +63,11 @@ func TestGetCommentIDs(t *testing.T) {
 		}, {
 			Body: "other",
 			ID:   4,
+		}, {
+			Body: "good - end",
+			ID:   5,
 		}},
-		expect: []int{2, 3},
+		expect: []int{2, 3, 5},
 	}}
 	for _, tt := range tests {
 		assert.Equal(t, tt.expect, getCommentIDs(tt.comments, "end"))

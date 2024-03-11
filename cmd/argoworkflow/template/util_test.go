@@ -59,10 +59,12 @@ func TestDuration(t *testing.T) {
 			assert.Equal(t, "3s", result)
 		},
 	}, {
-		name:      "have not finished",
-		startedAt: now,
+		name: "have not finished",
+		startedAt: v1.Time{
+			Time: now.Add(time.Millisecond * -1),
+		},
 		verify: func(t *testing.T, result string) {
-			assert.True(t, strings.HasSuffix(result, "µs"))
+			assert.True(t, strings.HasSuffix(result, "ms"), result)
 		},
 	}}
 	for _, tt := range tests {

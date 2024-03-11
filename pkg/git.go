@@ -34,7 +34,7 @@ func NewMaker(ctx context.Context, repoInfo RepoInformation) (maker *StatusMaker
 		return
 	}
 
-	repo := repoInfo.getRepoPath()
+	repo := repoInfo.GetRepoPath()
 	maker = NewStatusMaker(repo, repoInfo.Token)
 	maker.WithTarget(repoInfo.Target).WithPR(repoInfo.PrNumber).
 		WithServer(repoInfo.Server).
@@ -158,8 +158,8 @@ func (s *StatusMaker) CreateComment(ctx context.Context, message, endMarker stri
 }
 
 func getCommentIDs(comments []*scm.Comment, endMarker string) (commentIDs []int) {
-	for _, comment := range comments {
-		// comment := comments[i]
+	for i := range comments {
+		comment := comments[i]
 		if strings.HasSuffix(comment.Body, endMarker) {
 			commentIDs = append(commentIDs, comment.ID)
 		}
