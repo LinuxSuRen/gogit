@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/go-git/go-git/v5/plumbing/transport/http"
 
@@ -41,6 +42,8 @@ func newCheckoutCommand() (c *cobra.Command) {
 	flags.StringVarP(&opt.target, "target", "", ".", "Clone git repository to the target path")
 	flags.StringVarP(&opt.versionOutput, "version-output", "", "", "Write the version to target file")
 	flags.StringVarP(&opt.trimVersionPrefix, "version-trim-prefix", "", "", "Trim the prefix of the version")
+	flags.StringVarP(&opt.timestampOutput, "timestamp-output", "", "", "Write the current time to the target file")
+	flags.StringVarP(&opt.timestampFormat, "timestamp-format", "", "2006-01-02-150405", "The format of the time stamp")
 	return
 }
 
@@ -139,6 +142,14 @@ func (o *checkoutOption) runE(c *cobra.Command, args []string) (err error) {
 		if o.versionOutput != "" {
 			err = os.WriteFile(o.versionOutput, []byte(strings.TrimPrefix(version, o.trimVersionPrefix)), 0444)
 		}
+
+		switch o.timestampOutput {
+		case "":
+		case "-":
+			_, err = fmt.Fprint(c.OutOrStdout(), time.Now().Format(o.timestampFormat))
+		default:
+			err = os.WriteFile(o.timestampOutput, []byte(time.Now().Format(o.timestampFormat)), 0444)
+		}
 	}
 	return
 }
@@ -185,6 +196,8 @@ type checkoutOption struct {
 	sshPrivateKey     string
 	versionOutput     string
 	trimVersionPrefix string
+	timestampOutput   string
+	timestampFormat   string
 	username          string
 	password          string
 }
