@@ -2,6 +2,8 @@ package cmd
 
 import (
 	"fmt"
+	"github.com/mitchellh/go-homedir"
+	"github.com/pkg/errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -29,10 +31,15 @@ func newCheckoutCommand() (c *cobra.Command) {
 		RunE:    opt.runE,
 	}
 
+	userHomeDir, err := homedir.Dir()
+	if err != nil {
+		panic(errors.Wrap(err, "cannot find the home directory"))
+	}
+
 	flags := c.Flags()
 	flags.StringVarP(&opt.url, "url", "", "", "The git repository URL")
 	flags.StringVarP(&opt.remote, "remote", "", "origin", "The remote name")
-	flags.StringVarP(&opt.sshPrivateKey, "ssh-private-key", "", "$HOME/.ssh/id_rsa",
+	flags.StringVarP(&opt.sshPrivateKey, "ssh-private-key", "", filepath.Join(userHomeDir, ".ssh/id_rsa"),
 		"The SSH private key file path")
 	flags.StringVarP(&opt.username, "username", "", "", "The username of the git repository")
 	flags.StringVarP(&opt.password, "password", "", "", "The password of the git repository")
@@ -99,7 +106,6 @@ func (o *checkoutOption) runE(c *cobra.Command, args []string) (err error) {
 
 	if wd, err = repo.Worktree(); err == nil {
 		if c.Flags().Changed("branch") {
-			c.Printf("Switched to branch '%s'\n", o.branch)
 			version = o.branch
 
 			if err = wd.Checkout(&git.CheckoutOptions{
@@ -108,6 +114,7 @@ func (o *checkoutOption) runE(c *cobra.Command, args []string) (err error) {
 				err = fmt.Errorf("unable to checkout git branch: %s, error: %v", o.branch, err)
 				return
 			}
+			c.Printf("Switched to branch '%s'\n", o.branch)
 		}
 
 		if o.tag != "" {
@@ -117,6 +124,7 @@ func (o *checkoutOption) runE(c *cobra.Command, args []string) (err error) {
 				err = fmt.Errorf("unable to checkout git tag: %s, error: %v", o.tag, err)
 				return
 			}
+			c.Printf("Switched to tag '%s'\n", o.tag)
 		}
 
 		if o.pr > 0 {
@@ -136,6 +144,7 @@ func (o *checkoutOption) runE(c *cobra.Command, args []string) (err error) {
 				err = fmt.Errorf("unable to checkout git branch: %s, error: %v", o.tag, err)
 				return
 			}
+			c.Printf("Switched to pr-%d\n", o.pr)
 			version = fmt.Sprintf("pr-%d", o.pr)
 		}
 
