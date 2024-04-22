@@ -118,8 +118,15 @@ func (o *checkoutOption) runE(c *cobra.Command, args []string) (err error) {
 		}
 
 		if o.tag != "" {
+			var tagRef plumbing.ReferenceName
+			if strings.HasPrefix(o.tag, "refs/tags/") {
+				tagRef = plumbing.ReferenceName(o.tag)
+			} else {
+				tagRef = plumbing.NewTagReferenceName(o.tag)
+			}
+
 			if err = wd.Checkout(&git.CheckoutOptions{
-				Branch: plumbing.NewTagReferenceName(o.tag),
+				Branch: tagRef,
 			}); err != nil {
 				err = fmt.Errorf("unable to checkout git tag: %s, error: %v", o.tag, err)
 				return
