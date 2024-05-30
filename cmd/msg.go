@@ -56,7 +56,7 @@ func (o *commitOption) runE(cmd *cobra.Command, args []string) (err error) {
 	var gitdiff string
 	gitdiff, err = o.getGitDiff()
 
-	payload := oneapi.NewChatPayload(fmt.Sprintf("Please write a git commit message for the following git diff:\n%s", gitdiff), "chatglm_std")
+	payload := oneapi.NewChatPayload(fmt.Sprintf("Please write a conventional git commit message for the following git diff:\n%s", gitdiff), "chatglm_std")
 
 	var body []byte
 	if body, err = json.Marshal(payload); err != nil {
