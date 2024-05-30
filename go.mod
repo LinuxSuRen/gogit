@@ -1,6 +1,6 @@
 module github.com/linuxsuren/gogit
 
-go 1.18
+go 1.22
 
 require (
 	github.com/jenkins-x/go-scm v1.11.19
