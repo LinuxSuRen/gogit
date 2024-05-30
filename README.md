@@ -7,6 +7,17 @@
 
 ## Usage
 
+### Generate commit message with AI
+
+```shell
+export AI_PROVIDER=your-one-api-server-address
+export ONEAPI_TOKEN=your-one-api-token
+
+gogit commit
+```
+
+It supports [one-api](https://github.com/songquanpeng/one-api) only.
+
 ### Checkout to branch or PR
 Ideally, `gogit` could checkout to your branch or PR in any kind of git repository.
 

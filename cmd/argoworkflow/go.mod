@@ -1,6 +1,6 @@
 module github.com/linuxsuren/gogit/argoworkflow
 
-go 1.18
+go 1.22
 
 require (
 	github.com/argoproj/argo-workflows/v3 v3.4.4
