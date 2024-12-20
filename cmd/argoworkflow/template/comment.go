@@ -8,7 +8,7 @@ const CommentTemplate = `
 | Stage | Status | Duration |
 |---|---|---|
 {{- range $_, $status := .Status.Nodes}}
-| {{$status.DisplayName}} | {{$status.Phase}} | {{duration $status.FinishedAt $status.StartedAt}} |
+| {{$status.DisplayName}} | {{if eq $status.Phase "Failed"}}:broken_heart:{{else if eq $status.Phase "Succeeded"}}:white_check_mark:{{else if eq $status.Phase "Running"}}:hourglass_flowing_sand:{{end}} {{$status.Phase}} | {{duration $status.FinishedAt $status.StartedAt}} |
 {{- end}}
 `
 
