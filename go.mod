@@ -7,7 +7,7 @@ require (
 	github.com/linuxsuren/go-fake-runtime v0.0.4
 	github.com/mitchellh/go-homedir v1.1.0
 	github.com/spf13/cobra v1.6.1
-	github.com/stretchr/testify v1.8.2
+	github.com/stretchr/testify v1.10.0
 )
 
 require (
