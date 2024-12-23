@@ -68,10 +68,10 @@ jobs:
       - name: Check out code
         uses: actions/checkout@v3.0.0
       - name: Run GoReleaser
-        uses: goreleaser/goreleaser-action@v2.9.1
+        uses: goreleaser/goreleaser-action@v6
         with:
-          version: latest
-          args: release --skip-publish --rm-dist
+          version: '~> v2'
+          args: release --clean --snapshot
 
   build-image:
     name: Build Image
