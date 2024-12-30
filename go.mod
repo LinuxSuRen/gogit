@@ -1,10 +1,11 @@
 module github.com/linuxsuren/gogit
 
 go 1.22
+toolchain go1.23.4
 
 require (
 	github.com/jenkins-x/go-scm v1.11.19
-	github.com/linuxsuren/go-fake-runtime v0.0.4
+	github.com/linuxsuren/go-fake-runtime v0.0.5
 	github.com/mitchellh/go-homedir v1.1.0
 	github.com/spf13/cobra v1.6.1
 	github.com/stretchr/testify v1.8.2
