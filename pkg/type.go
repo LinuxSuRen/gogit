@@ -39,6 +39,11 @@ type RepoInformation struct {
 	Target      string
 	Label       string
 	Description string
+
+	Title string
+	Head  string
+	Base  string
+	Body  string
 }
 
 // String returns the human-readable string

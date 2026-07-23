@@ -27,6 +27,19 @@ func CreateComment(ctx context.Context, repoInfo RepoInformation, message, ident
 	return
 }
 
+// CreatePullRequest creates a pull request or merge request
+func CreatePullRequest(ctx context.Context, repoInfo RepoInformation) (pr *scm.PullRequest, err error) {
+	maker := NewStatusMaker(repoInfo.GetRepoPath(), repoInfo.Token)
+	maker.WithTarget(repoInfo.Target).
+		WithServer(repoInfo.Server).
+		WithProvider(repoInfo.Provider).
+		WithUsername(repoInfo.Username).
+		WithToken(repoInfo.Token)
+
+	pr, err = maker.CreatePullRequest(ctx, repoInfo)
+	return
+}
+
 // NewMaker creates a maker
 func NewMaker(ctx context.Context, repoInfo RepoInformation) (maker *StatusMaker) {
 	if repoInfo.PrNumber == -1 {
@@ -227,6 +240,27 @@ func (s *StatusMaker) ListStatus(ctx context.Context, label, desc string) (err e
 	} else {
 		err = fmt.Errorf("failed to find pull requests [%d] from [%s] %v", s.pr, s.repo, err)
 	}
+	return
+}
+
+// CreatePullRequest creates a pull request or merge request
+func (s *StatusMaker) CreatePullRequest(ctx context.Context, info RepoInformation) (pr *scm.PullRequest, err error) {
+	var scmClient *scm.Client
+	if scmClient, err = factory.NewClient(s.provider, s.server, s.token, func(c *scm.Client) {
+		c.Username = s.username
+	}); err != nil {
+		return
+	}
+
+	input := &scm.PullRequestInput{
+		Title: info.Title,
+		Head:  info.Head,
+		Base:  info.Base,
+		Body:  info.Body,
+	}
+
+	pr, _, err = scmClient.PullRequests.Create(ctx, s.repo, input)
+	err = WrapError(err, "failed to create pull request, repo is %q: %v", s.repo)
 	return
 }
 

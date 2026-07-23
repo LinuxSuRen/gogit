@@ -107,18 +107,29 @@ type gitProviderOption struct {
 }
 
 func (o *gitProviderOption) addFlags(c *cobra.Command) {
+	o.addCommonFlags(c)
+
+	flags := c.Flags()
+	flags.IntVarP(&o.pr, "pr", "", 1, "The pull request number")
+	_ = c.MarkFlagRequired("pr")
+}
+
+// addProviderFlags adds flags for provider repo and auth without --pr
+func (o *gitProviderOption) addProviderFlags(c *cobra.Command) {
+	o.addCommonFlags(c)
+}
+
+func (o *gitProviderOption) addCommonFlags(c *cobra.Command) {
 	flags := c.Flags()
 	flags.StringVarP(&o.provider, "provider", "p", "github", "The provider of git, such as: gitlab, github")
 	flags.StringVarP(&o.server, "server", "s", "", "The server address of target git provider, only need when it's a private provider")
 	flags.StringVarP(&o.owner, "owner", "o", "", "Owner of a git repository")
 	flags.StringVarP(&o.repo, "repo", "r", "", "Name of target git repository")
-	flags.IntVarP(&o.pr, "pr", "", 1, "The pull request number")
 	flags.StringVarP(&o.username, "username", "u", "", "Username of the git repository")
 	flags.StringVarP(&o.token, "token", "t", "",
 		"The access token of the git repository. Or you could provide a file path, such as: file:///var/token")
 
 	_ = c.MarkFlagRequired("repo")
-	_ = c.MarkFlagRequired("pr")
 	_ = c.MarkFlagRequired("username")
 	_ = c.MarkFlagRequired("token")
 }
