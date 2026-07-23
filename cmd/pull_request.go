@@ -32,6 +32,8 @@ func newPullRequestCmd() (c *cobra.Command) {
 	flags.StringVarP(&opt.msg, "msg", "", "", "The message of the pull request")
 	flags.StringSliceVarP(&opt.dingdingTokenPairs, "dingding-tokens", "", []string{}, "The dingding token pairs of the pull request, format: login=token")
 	flags.BoolVarP(&opt.skipInvalidPR, "skip-invalid-pr", "", true, "Skip the invalid pull request")
+
+	c.AddCommand(newPullRequestCreateCmd())
 	return
 }
 
@@ -165,4 +167,60 @@ type pullRequestOption struct {
 	dingdingTokenPairs []string
 	dingdingTokenMap   map[string]string
 	skipInvalidPR      bool
+}
+
+type pullRequestCreateOption struct {
+	gitProviderOption
+	title string
+	head  string
+	base  string
+	body  string
+}
+
+func newPullRequestCreateCmd() (c *cobra.Command) {
+	opt := &pullRequestCreateOption{}
+	c = &cobra.Command{
+		Use:   "create",
+		Short: "Create a pull request or merge request",
+		Example: `gogit pr create --provider github --username linuxsuren --repo owner/repo --token $GITHUB_TOKEN --title "feat: add new feature" --head feature-branch
+gogit pr create --provider gitlab --server https://codeup.aliyun.com --username xxx --repo owner/repo --token $TOKEN --title "feat: add feature" --head dev`,
+		PreRunE: opt.preRunE,
+		RunE:    opt.runE,
+	}
+	opt.addFlags(c)
+	flags := c.Flags()
+	flags.StringVarP(&opt.title, "title", "", "", "The title of the pull request")
+	flags.StringVarP(&opt.head, "head", "", "", "The source branch name")
+	flags.StringVarP(&opt.base, "base", "", "main", "The target branch name")
+	flags.StringVarP(&opt.body, "body", "", "", "The description of the pull request")
+
+	_ = c.MarkFlagRequired("title")
+	_ = c.MarkFlagRequired("head")
+	return
+}
+
+func (o *pullRequestCreateOption) preRunE(c *cobra.Command, args []string) (err error) {
+	o.preHandle()
+	return
+}
+
+func (o *pullRequestCreateOption) runE(c *cobra.Command, args []string) (err error) {
+	var pr *scm.PullRequest
+	if pr, err = pkg.CreatePullRequest(c.Context(), pkg.RepoInformation{
+		Provider: o.provider,
+		Server:   o.server,
+		Owner:    o.owner,
+		Repo:     o.repo,
+		Username: o.username,
+		Token:    o.token,
+		Title:    o.title,
+		Head:     o.head,
+		Base:     o.base,
+		Body:     o.body,
+	}); err != nil {
+		return
+	}
+
+	c.Printf("Pull request created: #%d %s\n", pr.Number, pr.Link)
+	return
 }
