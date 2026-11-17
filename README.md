@@ -12,6 +12,7 @@
 ```shell
 export AI_PROVIDER=your-one-api-server-address
 export ONEAPI_TOKEN=your-one-api-token
+export AI_MODEL=your-model    # optional, defaults to chatglm_std
 
 gogit commit
 ```
@@ -36,7 +37,7 @@ gogit status --provider gitlab \
   --repo yaml-readme \
   --pr 1 \
   --username linuxsuren \
-  --token h-zez9CWzyzykbLoS53s
+  --token $GIT_TOKEN
 ```
 
 Or in the following use cases:
@@ -52,7 +53,7 @@ gogit pr --provider gitlab \
   --repo yaml-readme \
   --pr 1 \
   --username linuxsuren \
-  --token h-zez9CWzyzykbLoS53s \
+  --token $GIT_TOKEN \
   --msg 'workflow done' \
   --dingding-tokens linuxsuren=dingdingtoken
 ```
