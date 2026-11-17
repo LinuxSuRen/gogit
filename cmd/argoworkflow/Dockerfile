@@ -1,4 +1,4 @@
-FROM golang:1.18 as builder
+FROM golang:1.26 as builder
 ARG GOPROXY=direct
 
 WORKDIR /workspace
@@ -7,7 +7,7 @@ COPY . .
 RUN go mod download
 RUN GOPROXY=${GOPROXY} CGO_ENABLED=0 go build -ldflags "-w -s" -o workflow-executor-gogit
 
-FROM alpine:3.10
+FROM alpine:3.22
 
 LABEL "repository"="https://github.com/linuxsuren/gogit"
 LABEL "homepage"="https://github.com/linuxsuren/gogit"

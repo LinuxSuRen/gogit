@@ -46,9 +46,10 @@ func TestGetOutputsWithTarget(t *testing.T) {
 
 	outputs := GetOutputsWithTarget(wf, "https://github.com")
 	for _, output := range outputs {
-		if output.Kind == "file" {
+		switch output.Kind {
+		case "file":
 			assert.Truef(t, strings.HasPrefix(output.File, "https://github.com"), output.File)
-		} else if output.Kind == "markdown" {
+		case "markdown":
 			assert.Equal(t, "## Report\n", output.Value)
 		}
 	}

@@ -25,7 +25,11 @@ SOFTWARE.
 package cmd
 
 import (
+	"encoding/json"
 	"io"
+	"net/http"
+	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/jenkins-x/go-scm/scm"
@@ -60,7 +64,7 @@ func TestPullRequestCmd(t *testing.T) {
 		c.SetArgs([]string{"pr", "--provider", "invalid", "--pr=1", "--repo=xxx/xxx", "--token=token", "--username=xxx"})
 		err := c.Execute()
 		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "Unsupported")
+		assert.Contains(t, strings.ToLower(err.Error()), "unsupported")
 	})
 
 	t.Run("invalid pr number, do not skip", func(t *testing.T) {
@@ -107,4 +111,60 @@ func TestFormatMessage(t *testing.T) {
 			assert.Equal(t, tt.expect, result)
 		})
 	}
+}
+
+func TestSendToDingDing(t *testing.T) {
+	originAPI := dingdingAPI
+	defer func() {
+		dingdingAPI = originAPI
+	}()
+
+	t.Run("message with special characters should be sent as valid JSON", func(t *testing.T) {
+		var receivedBody []byte
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			receivedBody, _ = io.ReadAll(r.Body)
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"errcode": 0, "errmsg": "ok"}`))
+		}))
+		defer server.Close()
+		dingdingAPI = server.URL
+
+		msg := `msg with "quotes", \backslash and
+newline`
+		err := sendToDingDing("login", "token", msg, &scm.PullRequest{}, io.Discard)
+		assert.Nil(t, err)
+
+		assert.True(t, json.Valid(receivedBody), "the payload should be valid JSON")
+		payload := map[string]interface{}{}
+		assert.Nil(t, json.Unmarshal(receivedBody, &payload))
+		text := payload["text"].(map[string]interface{})
+		assert.Equal(t, msg, text["content"])
+		// the token should not appear in the payload
+		assert.NotContains(t, string(receivedBody), "access_token")
+	})
+
+	t.Run("error response code from dingding", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"errcode": 310000, "errmsg": "keyword not in content"}`))
+		}))
+		defer server.Close()
+		dingdingAPI = server.URL
+
+		err := sendToDingDing("login", "token", "hello", &scm.PullRequest{}, io.Discard)
+		assert.NotNil(t, err)
+		assert.Contains(t, err.Error(), "keyword not in content")
+	})
+
+	t.Run("unexpected http status", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusBadGateway)
+		}))
+		defer server.Close()
+		dingdingAPI = server.URL
+
+		err := sendToDingDing("login", "token", "hello", &scm.PullRequest{}, io.Discard)
+		assert.NotNil(t, err)
+		assert.Contains(t, err.Error(), "502")
+	})
 }

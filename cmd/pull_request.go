@@ -1,7 +1,9 @@
 package cmd
 
 import (
+	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -32,6 +34,7 @@ func newPullRequestCmd() (c *cobra.Command) {
 	flags.StringVarP(&opt.msg, "msg", "", "", "The message of the pull request")
 	flags.StringSliceVarP(&opt.dingdingTokenPairs, "dingding-tokens", "", []string{}, "The dingding token pairs of the pull request, format: login=token")
 	flags.BoolVarP(&opt.skipInvalidPR, "skip-invalid-pr", "", true, "Skip the invalid pull request")
+	flags.BoolVarP(&opt.strict, "strict", "", false, "Exit with error when any notification fails to be sent")
 	return
 }
 
@@ -87,18 +90,36 @@ func (o *pullRequestOption) runE(c *cobra.Command, args []string) (err error) {
 	}
 
 	var wait sync.WaitGroup
-	for login, _ := range users {
+	var mu sync.Mutex
+	var sendErrs []error
+	for login := range users {
 		wait.Add(1)
 		go func(login string) {
 			defer wait.Done()
 			if token, ok := o.dingdingTokenMap[login]; ok {
-				sendToDingDing(login, token, o.msg, pr, c.OutOrStderr())
+				if sendErr := sendToDingDing(login, token, o.msg, pr, c.OutOrStderr()); sendErr != nil {
+					mu.Lock()
+					sendErrs = append(sendErrs, fmt.Errorf("failed to send the notification to %q: %v", login, sendErr))
+					mu.Unlock()
+				}
 			}
 		}(login)
 	}
 	wait.Wait()
+
+	if len(sendErrs) > 0 {
+		// notifications are best-effort by default, users can opt into failing via --strict
+		if o.strict {
+			err = errors.Join(sendErrs...)
+		} else {
+			c.PrintErrln(errors.Join(sendErrs...))
+		}
+	}
 	return
 }
+
+// dingdingAPI is the DingTalk robot API address, kept as a variable for testing
+var dingdingAPI = "https://oapi.dingtalk.com/robot/send"
 
 func sendToDingDing(login, token, msg string, pr *scm.PullRequest, c io.Writer) (err error) {
 	formattedMsg, fmtErr := formatMessage(msg, pr)
@@ -107,28 +128,40 @@ func sendToDingDing(login, token, msg string, pr *scm.PullRequest, c io.Writer) 
 		formattedMsg = msg
 	}
 
-	api := fmt.Sprintf("https://oapi.dingtalk.com/robot/send?access_token=%s", token)
-	payload := strings.NewReader(`{"msgtype": "text", "text": {"content": "` + formattedMsg + `"}}`)
-	fmt.Println(`{"msgtype": "text", "text": {"content": "`+formattedMsg+`"}}`, api)
+	api := fmt.Sprintf("%s?access_token=%s", dingdingAPI, token)
+	payload, mErr := json.Marshal(map[string]interface{}{
+		"msgtype": "text",
+		"text":    map[string]string{"content": formattedMsg},
+	})
+	if mErr != nil {
+		return fmt.Errorf("cannot marshal the notification payload: %v", mErr)
+	}
 
 	var resp *http.Response
-	resp, err = http.Post(api, "application/json", payload)
-	if err != nil {
-		fmt.Fprintln(c, err)
-	} else if resp.StatusCode != http.StatusOK {
-		fmt.Fprintf(c, "send message to %q failed, received code %d instead of 200\n", login, resp.StatusCode)
-	} else {
-		body, _ := io.ReadAll(resp.Body)
-
-		dingdingResp := &DingDingResponse{}
-		if err := json.Unmarshal(body, dingdingResp); err != nil {
-			fmt.Fprintf(c, "cannot unmarshal the response for %q: %v\n", login, err)
-		} else if dingdingResp.ErrCode != 0 {
-			fmt.Fprintf(c, "receive error response for %q: %q\n", login, dingdingResp.ErrMsg)
-		} else {
-			fmt.Fprintf(c, "send message to %q successfully\n", login)
-		}
+	if resp, err = http.Post(api, "application/json", bytes.NewReader(payload)); err != nil {
+		_, _ = fmt.Fprintln(c, err)
+		return
 	}
+	defer func() {
+		_ = resp.Body.Close()
+	}()
+
+	if resp.StatusCode != http.StatusOK {
+		_, _ = fmt.Fprintf(c, "send message to %q failed, received code %d instead of 200\n", login, resp.StatusCode)
+		return fmt.Errorf("unexpected status code %d", resp.StatusCode)
+	}
+
+	body, _ := io.ReadAll(resp.Body)
+	dingdingResp := &DingDingResponse{}
+	if uErr := json.Unmarshal(body, dingdingResp); uErr != nil {
+		_, _ = fmt.Fprintf(c, "cannot unmarshal the response for %q: %v\n", login, uErr)
+		return uErr
+	} else if dingdingResp.ErrCode != 0 {
+		_, _ = fmt.Fprintf(c, "receive error response for %q: %q\n", login, dingdingResp.ErrMsg)
+		return fmt.Errorf("receive error response: %q", dingdingResp.ErrMsg)
+	}
+
+	_, _ = fmt.Fprintf(c, "send message to %q successfully\n", login)
 	return
 }
 
@@ -165,4 +198,5 @@ type pullRequestOption struct {
 	dingdingTokenPairs []string
 	dingdingTokenMap   map[string]string
 	skipInvalidPR      bool
+	strict             bool
 }

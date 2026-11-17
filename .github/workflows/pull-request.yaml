@@ -8,6 +8,9 @@ on:
     branches:
       - master
 
+permissions:
+  contents: read
+
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
@@ -16,15 +19,14 @@ env:
 jobs:
   build:
     name: Build
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     steps:
-      - name: Set up go 1.22
-        uses: actions/setup-go@v3
+      - name: Set up Go
+        uses: actions/setup-go@v7
         with:
-          go-version: 1.22
-        id: go
+          go-version-file: go.mod
       - name: Check out code
-        uses: actions/checkout@v3.0.0
+        uses: actions/checkout@v7
       - name: Build
         run: |
           make build
@@ -32,92 +34,111 @@ jobs:
         run: |
           make test
       - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v1
+        uses: codecov/codecov-action@v7
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: coverage.out
           flags: unittests
           name: codecov-umbrella
-          fail_ci_if_error: true
-
 
   build-argo-workflow-executor:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     steps:
-      - name: Set up go 1.22
-        uses: actions/setup-go@v3
+      - name: Set up Go
+        uses: actions/setup-go@v7
         with:
-          go-version: 1.22
-        id: go
+          go-version-file: go.mod
       - name: Check out code
-        uses: actions/checkout@v3.0.0
+        uses: actions/checkout@v7
       - name: Test
         run: |
           make build-workflow-executor-gogit test-workflow-executor-gogit
 
+  lint:
+    name: Lint
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Set up Go
+        uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+      - name: Check out code
+        uses: actions/checkout@v7
+      - name: Run golangci-lint
+        uses: golangci/golangci-lint-action@v9
+        with:
+          args: ./...
+      - name: Run golangci-lint for the argoworkflow module
+        uses: golangci/golangci-lint-action@v9
+        with:
+          working-directory: cmd/argoworkflow
+          args: ./...
+
   goreleaser:
     name: Run GoReleaser
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     if: github.ref != 'refs/heads/master'
     steps:
-      - name: Set up go 1.22
-        uses: actions/setup-go@v3
+      - name: Set up Go
+        uses: actions/setup-go@v7
         with:
-          go-version: 1.22
-        id: go
+          go-version-file: go.mod
       - name: Check out code
-        uses: actions/checkout@v3.0.0
+        uses: actions/checkout@v7
       - name: Run GoReleaser
-        uses: goreleaser/goreleaser-action@v6
+        uses: goreleaser/goreleaser-action@v7
         with:
           version: '~> v2'
           args: release --clean --snapshot
 
   build-image:
     name: Build Image
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     if: github.ref != 'refs/heads/master'
     steps:
       - name: Check out code
-        uses: actions/checkout@v3.0.0
+        uses: actions/checkout@v7
       - name: Build Image
         run: |
           make image
 
   build-image-argo-workflow-executor:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     if: github.ref != 'refs/heads/master'
     steps:
       - name: Check out code
-        uses: actions/checkout@v3.0.0
+        uses: actions/checkout@v7
       - name: Build Image
         run: |
           make image-workflow-executor-gogit
 
   image:
     name: Publish Image
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     if: github.ref == 'refs/heads/master'
+    permissions:
+      contents: read
+      packages: write
     steps:
       - name: Checkout
-        uses: actions/checkout@v3.0.0
+        uses: actions/checkout@v7
       - name: Setup Docker buildx
-        uses: docker/setup-buildx-action@79abd3f86f79a9d68a23c75a09a9a85889262adf
+        uses: docker/setup-buildx-action@v4
       - name: Log into registry ${{ env.REGISTRY }}
         if: github.event_name != 'pull_request'
-        uses: docker/login-action@28218f9b04b4f3f62068d7b6ce6ca5b26e35336c
+        uses: docker/login-action@v4
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GH_PUBLISH_SECRETS }}
       - name: Extract Docker metadata
         id: meta
-        uses: docker/metadata-action@98669ae865ea3cffbcbaa878cf57c20bbf1c6c38
+        uses: docker/metadata-action@v6
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
       - name: Build and push Docker image
         id: build-and-push
-        uses: docker/build-push-action@ac9327eae2b366085ac7f6a2d02df8aa8ead720a
+        uses: docker/build-push-action@v7
         with:
           context: .
           push: ${{ github.event_name != 'pull_request' }}
@@ -127,28 +148,31 @@ jobs:
           cache-to: type=gha,mode=max
 
   image-argo-workflow-executor:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     if: github.ref == 'refs/heads/master'
+    permissions:
+      contents: read
+      packages: write
     steps:
       - name: Checkout
-        uses: actions/checkout@v3.0.0
+        uses: actions/checkout@v7
       - name: Setup Docker buildx
-        uses: docker/setup-buildx-action@79abd3f86f79a9d68a23c75a09a9a85889262adf
+        uses: docker/setup-buildx-action@v4
       - name: Log into registry ${{ env.REGISTRY }}
         if: github.event_name != 'pull_request'
-        uses: docker/login-action@28218f9b04b4f3f62068d7b6ce6ca5b26e35336c
+        uses: docker/login-action@v4
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GH_PUBLISH_SECRETS }}
       - name: Extract Docker metadata
         id: meta
-        uses: docker/metadata-action@98669ae865ea3cffbcbaa878cf57c20bbf1c6c38
+        uses: docker/metadata-action@v6
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_EXECUTOR_NAME }}
       - name: Build and push Docker image
         id: build-and-push
-        uses: docker/build-push-action@ac9327eae2b366085ac7f6a2d02df8aa8ead720a
+        uses: docker/build-push-action@v7
         with:
           context: cmd/argoworkflow
           push: ${{ github.event_name != 'pull_request' }}
@@ -158,9 +182,11 @@ jobs:
           cache-to: type=gha,mode=max
 
   UpdateReleaseDraft:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     if: github.ref == 'refs/heads/master'
+    permissions:
+      contents: write
     steps:
-      - uses: release-drafter/release-drafter@v5
+      - uses: release-drafter/release-drafter@v7
         env:
           GITHUB_TOKEN: ${{ secrets.GH_PUBLISH_SECRETS }}

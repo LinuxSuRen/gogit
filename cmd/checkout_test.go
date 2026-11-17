@@ -1,8 +1,15 @@
 package cmd
 
 import (
+	"io"
+	"os"
+	"path/filepath"
 	"testing"
 
+	"github.com/go-git/go-git/v5"
+	"github.com/go-git/go-git/v5/config"
+	"github.com/go-git/go-git/v5/plumbing"
+	"github.com/go-git/go-git/v5/plumbing/object"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -130,4 +137,86 @@ func TestPreRunE(t *testing.T) {
 			tt.verify(t, tt.opt)
 		})
 	}
+}
+
+func TestFindRemoteURL(t *testing.T) {
+	remotes := []*git.Remote{
+		git.NewRemote(nil, &config.RemoteConfig{Name: "origin", URLs: []string{"https://example.com/origin.git"}}),
+		git.NewRemote(nil, &config.RemoteConfig{Name: "upstream", URLs: []string{"https://example.com/upstream.git"}}),
+	}
+
+	assert.Equal(t, "https://example.com/origin.git", findRemoteURL(remotes, "origin"))
+	assert.Equal(t, "https://example.com/upstream.git", findRemoteURL(remotes, "upstream"))
+	// fall back to the first remote which has a URL
+	assert.Equal(t, "https://example.com/origin.git", findRemoteURL(remotes, "not-exist"))
+
+	// remotes without any URL should not panic
+	emptyRemotes := []*git.Remote{
+		git.NewRemote(nil, &config.RemoteConfig{Name: "origin"}),
+	}
+	assert.Empty(t, findRemoteURL(emptyRemotes, "origin"))
+	assert.Empty(t, findRemoteURL(nil, "origin"))
+}
+
+// TestCheckoutWithoutRemote makes sure checkout fails with a clear error
+// instead of panicking when the repository has no remote.
+func TestCheckoutWithoutRemote(t *testing.T) {
+	dir := t.TempDir()
+	_, err := git.PlainInit(dir, false)
+	assert.Nil(t, err)
+
+	c := newCheckoutCommand()
+	c.SetOut(io.Discard)
+	c.SetErr(io.Discard)
+	c.SetArgs([]string{"--target", dir})
+	err = c.Execute()
+	assert.NotNil(t, err)
+	assert.Contains(t, err.Error(), "cannot find any git remote")
+}
+
+// TestCheckoutDefaultBranch makes sure checkout works on repositories
+// whose default branch is not master.
+func TestCheckoutDefaultBranch(t *testing.T) {
+	srcDir := t.TempDir()
+	repo, err := git.PlainInit(srcDir, false)
+	assert.Nil(t, err)
+
+	wt, err := repo.Worktree()
+	assert.Nil(t, err)
+	assert.Nil(t, os.WriteFile(filepath.Join(srcDir, "README.md"), []byte("hello"), 0644))
+	_, err = wt.Add("README.md")
+	assert.Nil(t, err)
+	sig := &object.Signature{Name: "gogit", Email: "gogit@example.com"}
+	_, err = wt.Commit("init", &git.CommitOptions{Author: sig})
+	assert.Nil(t, err)
+
+	// rename the default branch to main
+	head, err := repo.Head()
+	assert.Nil(t, err)
+	assert.Nil(t, repo.Storer.SetReference(
+		plumbing.NewReferenceFromStrings("refs/heads/main", head.Hash().String())))
+	assert.Nil(t, repo.Storer.SetReference(
+		plumbing.NewSymbolicReference(plumbing.HEAD, plumbing.NewBranchReferenceName("main"))))
+	assert.Nil(t, repo.Storer.RemoveReference(plumbing.NewBranchReferenceName("master")))
+
+	target := t.TempDir()
+	versionFile := filepath.Join(t.TempDir(), "version")
+	c := newCheckoutCommand()
+	c.SetOut(io.Discard)
+	c.SetErr(io.Discard)
+	c.SetArgs([]string{srcDir, "--target", target, "--version-output", versionFile})
+	err = c.Execute()
+	assert.Nil(t, err)
+
+	// the default branch should be checked out
+	cloned, err := git.PlainOpen(target)
+	assert.Nil(t, err)
+	head, err = cloned.Head()
+	assert.Nil(t, err)
+	assert.Equal(t, "refs/heads/main", head.Name().String())
+
+	// the version falls back to the HEAD commit instead of being empty
+	version, err := os.ReadFile(versionFile)
+	assert.Nil(t, err)
+	assert.Equal(t, 8, len(version))
 }
