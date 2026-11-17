@@ -22,6 +22,14 @@ func TestStatus(t *testing.T) {
 		name:         "Special token: Succeeded",
 		status:       "Succeeded",
 		expectStatus: "success",
+	}, {
+		name:         "Alias: failed",
+		status:       "Failed",
+		expectStatus: "failure",
+	}, {
+		name:         "Alias: canceled",
+		status:       "canceled",
+		expectStatus: "cancelled",
 	}}
 	for i := range tests {
 		tt := tests[i]
@@ -31,6 +39,13 @@ func TestStatus(t *testing.T) {
 			assert.Equal(t, tt.expectStatus, opt.status)
 		})
 	}
+}
+
+func TestInvalidStatus(t *testing.T) {
+	opt := &statusOption{status: "unknown-status"}
+	err := opt.preRunE(nil, nil)
+	assert.NotNil(t, err)
+	assert.Contains(t, err.Error(), `invalid build status "unknown-status"`)
 }
 
 func TestTokenFromFile(t *testing.T) {
@@ -52,6 +67,14 @@ func TestTokenFromFile(t *testing.T) {
 			return f.Name()
 		},
 		expect: "token",
+	}, {
+		name: "token from file with trailing newline",
+		prepare: func() string {
+			f, _ := os.CreateTemp(os.TempDir(), "token")
+			_, _ = io.WriteString(f, "token\n")
+			return f.Name()
+		},
+		expect: "token",
 	}}
 	for i := range tests {
 		tt := tests[i]
@@ -68,6 +91,13 @@ func TestTokenFromFile(t *testing.T) {
 			assert.Equal(t, tt.expect, opt.token)
 		})
 	}
+}
+
+func TestTokenFromMissingFile(t *testing.T) {
+	opt := &statusOption{gitProviderOption: gitProviderOption{token: "file:///not-exist-token-file"}}
+	err := opt.preRunE(nil, nil)
+	assert.NotNil(t, err)
+	assert.Contains(t, err.Error(), "/not-exist-token-file")
 }
 
 func TestFlags(t *testing.T) {

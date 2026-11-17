@@ -44,7 +44,6 @@ import (
 	"github.com/linuxsuren/gogit/pkg"
 	"github.com/spf13/cobra"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 
 	"k8s.io/client-go/rest"
@@ -120,6 +119,25 @@ type pluginOption struct {
 	Option *option `json:"gogit-executor-plugin"`
 }
 
+// String returns the option as JSON with the access token masked,
+// it prevents the token from leaking into pod logs.
+func (o option) String() string {
+	masked := o
+	masked.Token = maskString(masked.Token)
+	if data, err := json.Marshal(masked); err == nil {
+		return string(data)
+	}
+	return ""
+}
+
+// maskString masks the given text, only keeping the first and last two characters
+func maskString(text string) string {
+	if len(text) <= 4 {
+		return "***"
+	}
+	return text[:2] + "***" + text[len(text)-2:]
+}
+
 func (e *DefaultPluginExecutor) Execute(args executor.ExecuteTemplateArgs, wf *wfv1.Workflow) (
 	resp executor.ExecuteTemplateResponse, err error) {
 	defer func() {
@@ -155,7 +173,6 @@ func (e *DefaultPluginExecutor) Execute(args executor.ExecuteTemplateArgs, wf *w
 		return
 	}
 	fmt.Println("option is", *opt.Option)
-
 	targetAddress := fmt.Sprintf("%s/workflows/%s/%s",
 		opt.Option.Target,
 		args.Workflow.ObjectMeta.Namespace,
@@ -195,7 +212,7 @@ func (e *DefaultPluginExecutor) Execute(args executor.ExecuteTemplateArgs, wf *w
 	}
 
 	if pr, parseErr := strconv.Atoi(opt.Option.PR); parseErr != nil {
-		fmt.Printf("wrong pull-request number %q, %v\n", opt.Option.PR, parseErr)
+		err = fmt.Errorf("wrong pull-request number %q, %v", opt.Option.PR, parseErr)
 		return
 	} else {
 		repo.PrNumber = pr
@@ -213,76 +230,84 @@ func (e *DefaultPluginExecutor) Execute(args executor.ExecuteTemplateArgs, wf *w
 
 	if err == nil && opt.Option.CreateComment {
 		fmt.Println("start to create comment")
-		tplText := EmptyThen(opt.Option.CommentTemplate, template.CommentTemplate)
-
-		// find useless nodes
-		var toRemoves []string
-		for key, val := range wf.Status.Nodes {
-			// TODO add a filter to allow users to do this, and keep this as default
-			if strings.HasSuffix(val.Name, ".onExit") || strings.Contains(val.Name, ".hooks.") {
-				toRemoves = append(toRemoves, key)
-			}
-
-			if val.FinishedAt.IsZero() {
-				val.FinishedAt = metav1.Now()
-				wf.Status.Nodes[key] = val
-			}
+		if err = handleComment(ctx, args, wf, opt, repo, targetAddress); err != nil {
+			fmt.Println("failed to create comment", err)
 		}
-		// remove useless nodes
-		delete(wf.Status.Nodes, wf.Name)
-		for _, key := range toRemoves {
-			delete(wf.Status.Nodes, key)
-		}
+	}
+	return
+}
 
-		// put the workflow link into annotations
-		if wf.Annotations == nil {
-			wf.Annotations = map[string]string{}
+// handleComment creates (or updates) the status comment against the pull request.
+// It also works for the workflows which do not use workflowTemplateRef.
+func handleComment(ctx context.Context, args executor.ExecuteTemplateArgs, wf *wfv1.Workflow,
+	opt *pluginOption, repo pkg.RepoInformation, targetAddress string) (err error) {
+	tplText := EmptyThen(opt.Option.CommentTemplate, template.CommentTemplate)
+
+	// find useless nodes
+	var toRemoves []string
+	for key, val := range wf.Status.Nodes {
+		// TODO add a filter to allow users to do this, and keep this as default
+		if strings.HasSuffix(val.Name, ".onExit") || strings.Contains(val.Name, ".hooks.") {
+			toRemoves = append(toRemoves, key)
 		}
 
+		if val.FinishedAt.IsZero() {
+			val.FinishedAt = metav1.Now()
+			wf.Status.Nodes[key] = val
+		}
+	}
+	// remove useless nodes
+	delete(wf.Status.Nodes, wf.Name)
+	for _, key := range toRemoves {
+		delete(wf.Status.Nodes, key)
+	}
+
+	// put the workflow link into annotations
+	if wf.Annotations == nil {
+		wf.Annotations = map[string]string{}
+	}
+
+	var targetTemplateAddress string
+	if wf.Spec.WorkflowTemplateRef != nil {
 		var templatePath string
 		if wf.Spec.WorkflowTemplateRef.ClusterScope {
 			templatePath = "cluster-workflow-templates"
 		} else {
 			templatePath = "workflow-templates"
 		}
-		targetTemplateAddress := fmt.Sprintf("%s/%s/%s/%s",
+		targetTemplateAddress = fmt.Sprintf("%s/%s/%s/%s",
 			opt.Option.Target,
 			templatePath,
 			args.Workflow.ObjectMeta.Namespace,
 			wf.Spec.WorkflowTemplateRef.Name)
-		wf.Annotations["workflow.link"] = targetAddress
-		wf.Annotations["workflow.templatelink"] = targetTemplateAddress
-		if wf.Status.FinishedAt.IsZero() {
-			// make sure the duration is positive
-			wf.Status.FinishedAt = metav1.Now()
-		}
+	}
+	wf.Annotations["workflow.link"] = targetAddress
+	wf.Annotations["workflow.templatelink"] = targetTemplateAddress
+	if wf.Status.FinishedAt.IsZero() {
+		// make sure the duration is positive
+		wf.Status.FinishedAt = metav1.Now()
+	}
 
-		deleteRetryNodes(wf)
+	deleteRetryNodes(wf)
 
-		var message string
-		message, err = template.RenderTemplate(tplText, wf)
-		if err == nil {
-			outputs := GetOutputsWithTarget(wf, opt.Option.Target)
-			var outputsComment string
-			if len(outputs) > 0 {
-				outputsComment, err = template.RenderTemplate(template.OutputsTemplate, outputs)
-			}
+	var message string
+	if message, err = template.RenderTemplate(tplText, wf); err != nil {
+		return fmt.Errorf("failed to render comment template: %v", err)
+	}
 
-			if err == nil {
-				if outputsComment != "" {
-					message = message + "\n" + outputsComment
-				}
-
-				err = pkg.CreateComment(ctx, repo, message, opt.Option.CommentIdentity)
-			}
-		} else {
-			err = fmt.Errorf("failed to render comment template: %v", err)
-		}
-
-		if err != nil {
-			fmt.Println("failed to create comment", err)
+	outputs := GetOutputsWithTarget(wf, opt.Option.Target)
+	var outputsComment string
+	if len(outputs) > 0 {
+		if outputsComment, err = template.RenderTemplate(template.OutputsTemplate, outputs); err != nil {
+			return
 		}
 	}
+
+	if outputsComment != "" {
+		message = message + "\n" + outputsComment
+	}
+
+	err = pkg.CreateComment(ctx, repo, message, opt.Option.CommentIdentity)
 	return
 }
 
@@ -309,8 +334,8 @@ type PluginExecutor interface {
 
 var (
 	ErrWrongContentType = errors.New("Content-Type header is not set to 'appliaction/json'")
-	ErrReadingBody      = errors.New("Couldn't read request body")
-	ErrMarshallingBody  = errors.New("Couldn't unmrashal request body")
+	ErrReadingBody      = errors.New("couldn't read the request body")
+	ErrMarshallingBody  = errors.New("couldn't unmarshal the request body")
 )
 
 func plugin(p PluginExecutor, client *wfclientset.Clientset) func(w http.ResponseWriter, req *http.Request) {
@@ -326,7 +351,6 @@ func plugin(p PluginExecutor, client *wfclientset.Clientset) func(w http.Respons
 			return
 		}
 
-		fmt.Println(string(body))
 		args := executor.ExecuteTemplateArgs{}
 		if err := json.Unmarshal(body, &args); err != nil || args.Workflow == nil || args.Template == nil {
 			http.Error(w, ErrMarshallingBody.Error(), http.StatusBadRequest)
@@ -341,8 +365,9 @@ func plugin(p PluginExecutor, client *wfclientset.Clientset) func(w http.Respons
 		if workflow, err = client.ArgoprojV1alpha1().Workflows(wfNamespace).Get(
 			context.Background(),
 			wfName,
-			v1.GetOptions{}); err != nil {
+			metav1.GetOptions{}); err != nil {
 			fmt.Println("failed to find workflow", wfName, wfNamespace, err)
+			http.Error(w, "failed to find the workflow", http.StatusInternalServerError)
 			return
 		}
 
@@ -353,10 +378,10 @@ func plugin(p PluginExecutor, client *wfclientset.Clientset) func(w http.Respons
 		if err != nil {
 			fmt.Println("something went wrong", err)
 			http.Error(w, "something went wrong", http.StatusBadRequest)
+			return
 		}
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write(jsonResp)
-		return
 	}
 }
 

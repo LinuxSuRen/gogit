@@ -42,7 +42,7 @@ func TestWrapError(t *testing.T) {
 		err:    nil,
 		expect: nil,
 	}, {
-		err:    defaultErr,
+		err:    errDefault,
 		msg:    "wrap %v",
 		expect: errors.New("wrap fake"),
 	}}
@@ -54,8 +54,8 @@ func TestWrapError(t *testing.T) {
 
 func TestIgnoreError(t *testing.T) {
 	assert.Equal(t, nil, pkg.IgnoreError(nil, "fake"))
-	assert.Equal(t, nil, pkg.IgnoreError(defaultErr, "fake"))
-	assert.Equal(t, defaultErr, pkg.IgnoreError(defaultErr, "other"))
+	assert.Equal(t, nil, pkg.IgnoreError(errDefault, "fake"))
+	assert.Equal(t, errDefault, pkg.IgnoreError(errDefault, "other"))
 }
 
-var defaultErr = errors.New("fake")
+var errDefault = errors.New("fake")
