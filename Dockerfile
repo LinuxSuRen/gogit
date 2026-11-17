@@ -1,4 +1,4 @@
-FROM golang:1.22 as builder
+FROM golang:1.26 as builder
 
 WORKDIR /workspace
 COPY cmd/ cmd
@@ -10,7 +10,7 @@ COPY main.go main.go
 RUN go mod download
 RUN CGO_ENABLED=0 go build -ldflags "-w -s" -o gogit
 
-FROM alpine:3.10
+FROM alpine:3.22
 
 LABEL "repository"="https://github.com/linuxsuren/gogit"
 LABEL "homepage"="https://github.com/linuxsuren/gogit"

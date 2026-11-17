@@ -87,12 +87,12 @@ func (o *pullRequestOption) runE(c *cobra.Command, args []string) (err error) {
 	}
 
 	var wait sync.WaitGroup
-	for login, _ := range users {
+	for login := range users {
 		wait.Add(1)
 		go func(login string) {
 			defer wait.Done()
 			if token, ok := o.dingdingTokenMap[login]; ok {
-				sendToDingDing(login, token, o.msg, pr, c.OutOrStderr())
+				_ = sendToDingDing(login, token, o.msg, pr, c.OutOrStderr())
 			}
 		}(login)
 	}
@@ -114,19 +114,19 @@ func sendToDingDing(login, token, msg string, pr *scm.PullRequest, c io.Writer) 
 	var resp *http.Response
 	resp, err = http.Post(api, "application/json", payload)
 	if err != nil {
-		fmt.Fprintln(c, err)
+		_, _ = fmt.Fprintln(c, err)
 	} else if resp.StatusCode != http.StatusOK {
-		fmt.Fprintf(c, "send message to %q failed, received code %d instead of 200\n", login, resp.StatusCode)
+		_, _ = fmt.Fprintf(c, "send message to %q failed, received code %d instead of 200\n", login, resp.StatusCode)
 	} else {
 		body, _ := io.ReadAll(resp.Body)
 
 		dingdingResp := &DingDingResponse{}
 		if err := json.Unmarshal(body, dingdingResp); err != nil {
-			fmt.Fprintf(c, "cannot unmarshal the response for %q: %v\n", login, err)
+			_, _ = fmt.Fprintf(c, "cannot unmarshal the response for %q: %v\n", login, err)
 		} else if dingdingResp.ErrCode != 0 {
-			fmt.Fprintf(c, "receive error response for %q: %q\n", login, dingdingResp.ErrMsg)
+			_, _ = fmt.Fprintf(c, "receive error response for %q: %q\n", login, dingdingResp.ErrMsg)
 		} else {
-			fmt.Fprintf(c, "send message to %q successfully\n", login)
+			_, _ = fmt.Fprintf(c, "send message to %q successfully\n", login)
 		}
 	}
 	return
