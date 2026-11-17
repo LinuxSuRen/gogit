@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"fmt"
 	"os"
 	"strings"
 
@@ -14,7 +15,7 @@ func newStatusCmd() (cmd *cobra.Command) {
 	opt := &statusOption{}
 	cmd = &cobra.Command{
 		Use:     "status",
-		Short:   "Send the build token to a PR of Gitlab/GitHub",
+		Short:   "Send the build status to a PR of Gitlab/GitHub",
 		PreRunE: opt.preRunE,
 		RunE:    opt.runE,
 	}
@@ -22,14 +23,21 @@ func newStatusCmd() (cmd *cobra.Command) {
 	opt.addFlags(cmd)
 	flags := cmd.Flags()
 	flags.StringVarP(&opt.status, "status", "", "",
-		"Build token, such as: pending, success, cancelled, error")
+		"Build status, such as: pending, success, cancelled, error")
 	flags.StringVarP(&opt.target, "target", "", "https://github.com/LinuxSuRen/gogit", "Address of the build server")
 	flags.StringVarP(&opt.label, "label", "", "",
-		"Identity of a build token")
+		"Identity of a build status")
 	flags.StringVarP(&opt.description, "description", "", "",
-		"The description of a build token")
+		"The description of a build status")
 	flags.BoolVarP(&opt.print, "print", "", false, "Print the status list then exit")
 	return
+}
+
+// statusAliases keeps the status be compatible with different systems
+var statusAliases = map[string]string{
+	"succeeded": "success", // from Argo Workflows
+	"failed":    "failure",
+	"canceled":  "cancelled",
 }
 
 func (o *statusOption) preRunE(cmd *cobra.Command, args []string) (err error) {
@@ -37,24 +45,30 @@ func (o *statusOption) preRunE(cmd *cobra.Command, args []string) (err error) {
 	if o.label == "" {
 		o.label = "gogit"
 	}
-	if o.description == "" {
-		o.description = ""
+
+	// keep the status be compatible with different system
+	o.status = strings.ToLower(o.status)
+	o.status = strings.TrimSpace(o.status)
+	if alias, ok := statusAliases[o.status]; ok {
+		o.status = alias
 	}
 
-	// keep the token be compatible with different system
-	switch o.status {
-	case "Succeeded":
-		// from Argo Workflow
-		o.status = "success"
+	if o.status != "" {
+		if scm.ToState(o.status) == scm.StateUnknown {
+			err = fmt.Errorf("invalid build status %q, please choose from: pending, running, success, failure, cancelled, expected, error", o.status)
+			return
+		}
 	}
-	o.status = strings.ToLower(o.status)
 
 	if strings.HasPrefix(o.token, "file://") {
 		tokenFile := strings.TrimPrefix(o.token, "file://")
 		var data []byte
-		if data, err = os.ReadFile(tokenFile); err == nil {
-			o.token = string(data)
+		if data, err = os.ReadFile(tokenFile); err != nil {
+			err = fmt.Errorf("failed to read the token file %s: %v", tokenFile, err)
+			return
 		}
+		// token files usually carry a trailing newline which breaks the authentication
+		o.token = strings.TrimSpace(string(data))
 	}
 	return
 }

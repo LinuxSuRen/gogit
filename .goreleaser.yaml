@@ -1,3 +1,5 @@
+version: 2
+
 builds:
   - env:
       - CGO_ENABLED=0
@@ -5,12 +7,15 @@ builds:
       - linux
       - windows
       - darwin
+    ldflags:
+      - -s -w -X github.com/linuxsuren/gogit/pkg/version.Version={{ .Version }}
 archives:
-  - name_template: "{{ .Binary }}-{{ .Os }}-{{ .Arch }}"
+  - name_template: "{{ .Binary }}-{{ .Version }}-{{ .Os }}-{{ .Arch }}"
+    formats: [ tar.gz ]
     format_overrides:
       - goos: windows
-        format: zip
+        formats: [ zip ]
     files:
       - README.md
 snapshot:
-  name_template: "{{ incpatch .Version }}-next"
+  version_template: "{{ incpatch .Version }}-next"

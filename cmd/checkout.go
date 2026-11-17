@@ -75,13 +75,18 @@ func (o *checkoutOption) runE(c *cobra.Command, args []string) (err error) {
 
 	var repo *git.Repository
 	if _, serr := os.Stat(filepath.Join(repoDir, ".git")); serr != nil {
-		if repo, err = git.PlainCloneContext(c.Context(), repoDir, false, &git.CloneOptions{
-			RemoteName:    o.remote,
-			Auth:          gitAuth,
-			URL:           o.url,
-			ReferenceName: plumbing.NewBranchReferenceName(o.branch),
-			Progress:      c.OutOrStdout(),
-		}); err != nil {
+		cloneOpts := &git.CloneOptions{
+			RemoteName: o.remote,
+			Auth:       gitAuth,
+			URL:        o.url,
+			Progress:   c.OutOrStdout(),
+		}
+		if c.Flags().Changed("branch") {
+			// only use the given branch as the clone reference when it is explicitly set,
+			// otherwise go-git checks out the default branch (remote HEAD) of the repository
+			cloneOpts.ReferenceName = plumbing.NewBranchReferenceName(o.branch)
+		}
+		if repo, err = git.PlainCloneContext(c.Context(), repoDir, false, cloneOpts); err != nil {
 			err = fmt.Errorf("failed to clone git repository '%s' into '%s', error: %v", o.url, repoDir, err)
 			return
 		}
@@ -97,7 +102,11 @@ func (o *checkoutOption) runE(c *cobra.Command, args []string) (err error) {
 		return
 	}
 
-	remoteURL := remotes[0].Config().URLs[0]
+	remoteURL := findRemoteURL(remotes, o.remote)
+	if remoteURL == "" {
+		err = fmt.Errorf("cannot find any git remote of repository '%s', please check the remote config", repoDir)
+		return
+	}
 	kind := detectGitKind(remoteURL)
 	// need to get auth again if the repo was exist
 	if gitAuth, err = o.getAuth(remoteURL); err != nil {
@@ -148,7 +157,7 @@ func (o *checkoutOption) runE(c *cobra.Command, args []string) (err error) {
 			if err = wd.Checkout(&git.CheckoutOptions{
 				Branch: plumbing.ReferenceName(fmt.Sprintf("pr-%d", o.pr)),
 			}); err != nil && !strings.Contains(err.Error(), "already exists") {
-				err = fmt.Errorf("unable to checkout git branch: %s, error: %v", o.tag, err)
+				err = fmt.Errorf("unable to checkout git branch: pr-%d, error: %v", o.pr, err)
 				return
 			}
 			c.Printf("Switched to pr-%d\n", o.pr)
@@ -156,7 +165,15 @@ func (o *checkoutOption) runE(c *cobra.Command, args []string) (err error) {
 		}
 
 		if o.versionOutput != "" {
-			err = os.WriteFile(o.versionOutput, []byte(strings.TrimPrefix(version, o.trimVersionPrefix)), 0444)
+			if version == "" {
+				// fall back to the current HEAD commit when no branch, tag or pr is given
+				var head *plumbing.Reference
+				if head, err = repo.Head(); err != nil {
+					return
+				}
+				version = head.Hash().String()[:8]
+			}
+			err = os.WriteFile(o.versionOutput, []byte(strings.TrimPrefix(version, o.trimVersionPrefix)), 0644)
 		}
 
 		switch o.timestampOutput {
@@ -164,7 +181,7 @@ func (o *checkoutOption) runE(c *cobra.Command, args []string) (err error) {
 		case "-":
 			_, err = fmt.Fprint(c.OutOrStdout(), time.Now().Format(o.timestampFormat))
 		default:
-			err = os.WriteFile(o.timestampOutput, []byte(time.Now().Format(o.timestampFormat)), 0444)
+			err = os.WriteFile(o.timestampOutput, []byte(time.Now().Format(o.timestampFormat)), 0644)
 		}
 	}
 	return
@@ -187,6 +204,22 @@ func detectGitKind(gitURL string) (kind string) {
 	kind = "gitlab"
 	if strings.Contains(gitURL, "github.com") {
 		kind = "github"
+	}
+	return
+}
+
+// findRemoteURL returns the URL of the given remote.
+// It falls back to the first remote which has a URL when the given remote is not found.
+func findRemoteURL(remotes []*git.Remote, name string) (url string) {
+	for _, remote := range remotes {
+		if remote.Config().Name == name && len(remote.Config().URLs) > 0 {
+			return remote.Config().URLs[0]
+		}
+	}
+	for _, remote := range remotes {
+		if len(remote.Config().URLs) > 0 {
+			return remote.Config().URLs[0]
+		}
 	}
 	return
 }
