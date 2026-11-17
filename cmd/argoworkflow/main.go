@@ -44,7 +44,6 @@ import (
 	"github.com/linuxsuren/gogit/pkg"
 	"github.com/spf13/cobra"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 
 	"k8s.io/client-go/rest"
@@ -309,8 +308,8 @@ type PluginExecutor interface {
 
 var (
 	ErrWrongContentType = errors.New("Content-Type header is not set to 'appliaction/json'")
-	ErrReadingBody      = errors.New("Couldn't read request body")
-	ErrMarshallingBody  = errors.New("Couldn't unmrashal request body")
+	ErrReadingBody      = errors.New("couldn't read the request body")
+	ErrMarshallingBody  = errors.New("couldn't unmarshal the request body")
 )
 
 func plugin(p PluginExecutor, client *wfclientset.Clientset) func(w http.ResponseWriter, req *http.Request) {
@@ -341,7 +340,7 @@ func plugin(p PluginExecutor, client *wfclientset.Clientset) func(w http.Respons
 		if workflow, err = client.ArgoprojV1alpha1().Workflows(wfNamespace).Get(
 			context.Background(),
 			wfName,
-			v1.GetOptions{}); err != nil {
+			metav1.GetOptions{}); err != nil {
 			fmt.Println("failed to find workflow", wfName, wfNamespace, err)
 			return
 		}
@@ -356,7 +355,6 @@ func plugin(p PluginExecutor, client *wfclientset.Clientset) func(w http.Respons
 		}
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write(jsonResp)
-		return
 	}
 }
 

@@ -26,6 +26,7 @@ package cmd
 
 import (
 	"io"
+	"strings"
 	"testing"
 
 	"github.com/jenkins-x/go-scm/scm"
@@ -60,7 +61,7 @@ func TestPullRequestCmd(t *testing.T) {
 		c.SetArgs([]string{"pr", "--provider", "invalid", "--pr=1", "--repo=xxx/xxx", "--token=token", "--username=xxx"})
 		err := c.Execute()
 		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "Unsupported")
+		assert.Contains(t, strings.ToLower(err.Error()), "unsupported")
 	})
 
 	t.Run("invalid pr number, do not skip", func(t *testing.T) {

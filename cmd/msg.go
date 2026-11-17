@@ -54,7 +54,9 @@ func (o *commitOption) preRunE(cmd *cobra.Command, args []string) (err error) {
 
 func (o *commitOption) runE(cmd *cobra.Command, args []string) (err error) {
 	var gitdiff string
-	gitdiff, err = o.getGitDiff()
+	if gitdiff, err = o.getGitDiff(); err != nil {
+		return
+	}
 
 	payload := oneapi.NewChatPayload(fmt.Sprintf("Please write a conventional git commit message for the following git diff:\n%s", gitdiff), "chatglm_std")
 
@@ -111,9 +113,7 @@ func (o *commitOption) runE(cmd *cobra.Command, args []string) (err error) {
 		}
 
 		opts := []string{"git", "commit", "--edit", "--file", tempF.Name()}
-		for _, flag := range o.flags {
-			opts = append(opts, flag)
-		}
+		opts = append(opts, o.flags...)
 
 		err = syscall.Exec(gitExe, opts, append(os.Environ(), "GIT_EDITOR=vim"))
 	}

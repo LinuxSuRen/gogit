@@ -10,8 +10,8 @@ import (
 )
 
 func TestCommentTemplate(t *testing.T) {
-	var layout string = "2006-01-02 15:04:05"
-	var timeStr string = "2019-12-12 15:22:12"
+	layout := "2006-01-02 15:04:05"
+	timeStr := "2019-12-12 15:22:12"
 	targetTime, err := time.ParseInLocation(layout, timeStr, time.Local)
 	assert.Nil(t, err)
 
